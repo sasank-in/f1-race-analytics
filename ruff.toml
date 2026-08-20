@@ -1,0 +1,14 @@
+line-length = 100
+target-version = "py312"
+src = ["backend/src", "tests"]
+
+[lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF", "S", "BLE", "ARG"]
+
+[lint.per-file-ignores]
+# Tests assert; pytest fixtures are passed positionally and may go unused in a body.
+"tests/*" = ["S101", "ARG001"]
+# `doctor` reports every dependency failure in a table instead of raising on the first.
+"backend/src/f1x/cli.py" = ["BLE001"]
+# Local-development defaults, overridden by .env in every real deployment.
+"backend/src/f1x/config.py" = ["S105", "S106"]

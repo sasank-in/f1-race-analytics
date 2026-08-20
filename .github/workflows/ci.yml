@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: timescale/timescaledb-ha:pg16
+        env:
+          POSTGRES_USER: f1x
+          POSTGRES_PASSWORD: f1x
+          POSTGRES_DB: f1x
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U f1x -d f1x"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e "backend[dev]"
+
+      - name: Provision schemas
+        env:
+          PGPASSWORD: f1x
+        run: psql -h localhost -p 5433 -U f1x -d f1x -f db/sql/00_extensions.sql
+
+      - name: Lint
+        run: ruff check backend/src tests
+
+      - name: Typecheck
+        run: mypy --config-file mypy.ini backend/src/f1x
+
+      - name: Test
+        run: pytest tests -v
+        env:
+          POSTGRES_HOST: localhost
+          DB_PORT: 5433

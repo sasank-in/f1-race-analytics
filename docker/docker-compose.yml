@@ -1,0 +1,55 @@
+name: f1x
+
+services:
+  db:
+    image: timescale/timescaledb-ha:pg16
+    container_name: f1x-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-f1x}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-f1x}
+      POSTGRES_DB: ${POSTGRES_DB:-f1x}
+      # Telemetry ingest is write-heavy and analysis is scan-heavy.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - max_wal_size=4GB
+      - -c
+      - work_mem=64MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - effective_cache_size=4GB
+      - -c
+      - random_page_cost=1.1
+    ports:
+      # 5433 on the host: 5432 is already taken by the local PostgreSQL install.
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - f1x-pgdata:/home/postgres/pgdata/data
+      - ../db/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-f1x} -d ${POSTGRES_DB:-f1x}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: f1x-redis
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  f1x-pgdata:
