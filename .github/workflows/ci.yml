@@ -38,6 +38,23 @@ jobs:
       - name: Install
         run: pip install -e "backend[dev]"
 
+      # pg_isready reports "accepting connections" while TimescaleDB is still
+      # initialising, so the service health check alone is not enough to start issuing
+      # DDL against. Wait for a real query to succeed.
+      - name: Wait for database
+        env:
+          PGPASSWORD: f1x
+        run: |
+          for i in $(seq 1 30); do
+            if psql -h localhost -p 5433 -U f1x -d f1x -c 'SELECT 1' >/dev/null 2>&1; then
+              echo "database ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "database did not become ready in 30s" >&2
+          exit 1
+
       # The compose stack mounts db/sql into docker-entrypoint-initdb.d; the Actions
       # service container does not, so extensions and schemas are applied explicitly.
       - name: Provision extensions and schemas
@@ -58,6 +75,21 @@ jobs:
           POSTGRES_HOST: localhost
           DB_PORT: 5433
         run: alembic check
+
+      # Makes a provisioning failure obvious in the log instead of surfacing as a
+      # cascade of "relation does not exist" errors further down.
+      - name: Verify schema
+        env:
+          PGPASSWORD: f1x
+        run: |
+          psql -h localhost -p 5433 -U f1x -d f1x -v ON_ERROR_STOP=1 -c "
+            SELECT
+              (SELECT count(*) FROM information_schema.tables
+                 WHERE table_schema IN ('core','mart') AND table_type='BASE TABLE') AS tables,
+              (SELECT count(*) FROM timescaledb_information.hypertables) AS hypertables,
+              (SELECT count(*) FROM timescaledb_information.continuous_aggregates) AS caggs;
+          "
+          test "$(psql -h localhost -p 5433 -U f1x -d f1x -tAc             "SELECT count(*) FROM timescaledb_information.hypertables")" = "4"
 
       - name: Lint
         run: ruff check backend/src tests
