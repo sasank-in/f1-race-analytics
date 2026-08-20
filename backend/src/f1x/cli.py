@@ -93,5 +93,78 @@ def doctor() -> None:
     console.print("\n[green]All checks passed.[/]")
 
 
+db_app = typer.Typer(help="Database inspection.", no_args_is_help=True)
+app.add_typer(db_app, name="db")
+
+
+@db_app.command("status")
+def db_status() -> None:
+    """Show tables, hypertables, chunk intervals and compression state."""
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    with engine.connect() as conn:
+        revision = conn.execute(
+            text("SELECT version_num FROM core.alembic_version")
+        ).scalar_one_or_none()
+
+        counts = Table("schema", "tables", title="schema")
+        for schema, n in conn.execute(
+            text(
+                "SELECT table_schema, count(*) FROM information_schema.tables "
+                "WHERE table_schema IN ('core', 'mart') AND table_type = 'BASE TABLE' "
+                "GROUP BY 1 ORDER BY 1"
+            )
+        ):
+            counts.add_row(schema, str(n))
+
+        ht = Table("hypertable", "chunk interval", "compressed", "chunks", title="hypertables")
+        for name, interval, compressed, chunks in conn.execute(
+            text(
+                "SELECT h.hypertable_name, d.time_interval, h.compression_enabled, "
+                "       (SELECT count(*) FROM timescaledb_information.chunks c "
+                "        WHERE c.hypertable_name = h.hypertable_name) "
+                "FROM timescaledb_information.hypertables h "
+                "JOIN timescaledb_information.dimensions d "
+                "  ON d.hypertable_name = h.hypertable_name "
+                "WHERE h.hypertable_schema = 'core' ORDER BY 1"
+            )
+        ):
+            ht.add_row(name, str(interval), "yes" if compressed else "no", str(chunks))
+
+    console.print(f"migration revision: [cyan]{revision or 'none'}[/]")
+    console.print(counts)
+    console.print(ht)
+
+
+@db_app.command("rowcounts")
+def db_rowcounts() -> None:
+    """Row counts for every core and mart table."""
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    table = Table("table", "rows", title="row counts")
+    with engine.connect() as conn:
+        names = [
+            f"{r[0]}.{r[1]}"
+            for r in conn.execute(
+                text(
+                    "SELECT table_schema, table_name FROM information_schema.tables "
+                    "WHERE table_schema IN ('core', 'mart') AND table_type = 'BASE TABLE' "
+                    "  AND table_name <> 'alembic_version' "
+                    "ORDER BY 1, 2"
+                )
+            )
+        ]
+        for name in names:
+            # Identifiers come from information_schema and are quoted before use,
+            # so they cannot carry injected SQL.
+            schema, _, tbl = name.partition(".")
+            qualified = f'"{schema}"."{tbl}"'
+            n = conn.execute(text(f"SELECT count(*) FROM {qualified}")).scalar_one()  # noqa: S608
+            table.add_row(name, f"{n:,}")
+    console.print(table)
+
+
 if __name__ == "__main__":
     app()

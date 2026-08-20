@@ -30,8 +30,12 @@ py -3.12 -m venv .venv
 # 3. copy config
 cp .env.example .env
 
-# 4. verify everything is wired up
-.venv/Scripts/f1x doctor
+# 4. apply the schema
+cd backend && ../.venv/Scripts/python.exe -m alembic upgrade head && cd ..
+
+# 5. verify everything is wired up
+.venv/Scripts/python.exe -m f1x.cli doctor
+.venv/Scripts/python.exe -m f1x.cli db status
 ```
 
 `f1x doctor` checks PostgreSQL, the TimescaleDB extension, the `raw`/`core`/`mart`
