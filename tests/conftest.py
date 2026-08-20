@@ -31,15 +31,27 @@ def db_url() -> str:
 
 @pytest.fixture(scope="session")
 def db_engine(db_url: str) -> Iterator[object]:
-    """SQLAlchemy engine against the live database. Skips if unreachable."""
+    """SQLAlchemy engine against the live database. Fails loudly if unreachable."""
     from sqlalchemy import create_engine, text
 
-    engine = create_engine(db_url, pool_pre_ping=True)
+    # Short timeout: an unreachable database should fail in seconds, not hang for
+    # minutes on the default TCP timeout.
+    engine = create_engine(
+        db_url, pool_pre_ping=True, connect_args={"connect_timeout": 5}
+    )
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
     except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"database not reachable: {exc}")
+        # Skipping by default would let a real outage read as a green run, so require
+        # an explicit opt-out for environments that genuinely have no database.
+        if os.environ.get("F1X_SKIP_DB_TESTS"):
+            pytest.skip(f"database not reachable (F1X_SKIP_DB_TESTS set): {exc}")
+        pytest.fail(
+            f"database not reachable at {db_url}: {exc}\n"
+            "Start it with: docker compose -f docker/docker-compose.yml up -d\n"
+            "Or set F1X_SKIP_DB_TESTS=1 to skip integration tests."
+        )
     yield engine
     engine.dispose()
 
