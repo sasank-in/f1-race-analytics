@@ -38,10 +38,26 @@ jobs:
       - name: Install
         run: pip install -e "backend[dev]"
 
-      - name: Provision schemas
+      # The compose stack mounts db/sql into docker-entrypoint-initdb.d; the Actions
+      # service container does not, so extensions and schemas are applied explicitly.
+      - name: Provision extensions and schemas
         env:
           PGPASSWORD: f1x
-        run: psql -h localhost -p 5433 -U f1x -d f1x -f db/sql/00_extensions.sql
+        run: psql -h localhost -p 5433 -U f1x -d f1x -v ON_ERROR_STOP=1 -f db/sql/00_extensions.sql
+
+      - name: Apply migrations
+        working-directory: backend
+        env:
+          POSTGRES_HOST: localhost
+          DB_PORT: 5433
+        run: alembic upgrade head
+
+      - name: Check for model/database drift
+        working-directory: backend
+        env:
+          POSTGRES_HOST: localhost
+          DB_PORT: 5433
+        run: alembic check
 
       - name: Lint
         run: ruff check backend/src tests
