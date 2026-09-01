@@ -279,6 +279,47 @@ works on any circuit, including ones added after it was written, and adapts to l
 changes without a data update. Per corner it reports minimum speed, entry and exit
 speeds, braking point and throttle-application point.
 
+### Simulation
+
+```bash
+.venv/Scripts/python.exe -m f1x.cli simulate race 138
+.venv/Scripts/python.exe -m f1x.cli simulate championship 2023 --races-remaining 12
+```
+
+A strategy comparison that returns one number is misleading. "Two stops is four seconds
+faster" sounds decisive until a safety car falls in the wrong place. The simulation runs
+a race thousands of times with the uncertain quantities resampled — lap-time noise,
+safety-car timing, pit variation — and reports how often each strategy actually wins.
+
+All strategies share one random seed, so they face the same sampled races. Without that,
+differences between strategies would be confounded with differences in the luck each one
+happened to draw.
+
+At Bahrain the 2-stop wins **67%** against the 3-stop's 32% — decisive, but with the
+alternative live enough to be worth holding. At Jeddah the 1-stop wins outright. Both
+match what teams ran.
+
+**How the safety car is modelled** is the load-bearing decision. Slowing the neutralised
+laps by 40% — the physically obvious approach — produced a **170-second spread** that
+swamped the ~4 s separating strategies and made every race read as a coin toss. But a
+safety car slows *every* car equally, so it barely moves the relative standing this
+simulation compares. What it genuinely changes is the cost of pitting, since a stop made
+under neutralisation loses far less track position. Modelling only that asymmetry cut the
+spread to 15–21 s and let real differences show.
+
+**Championship projection** samples the remaining calendar from demonstrated pace. The
+`PACE_SENSITIVITY` constant is fitted, not chosen: 2023's fastest car won 19 of 22 races
+(86%), and feeding this engine's own measured pace gaps through the sampler at 5.0
+reproduces 84%.
+
+Run against 2023 it recovers **Verstappen 530, Pérez 260, Hamilton 217** against actual
+finals of 575, 285, 234 — the championship order reconstructed from lap times alone.
+
+Title probabilities saturate quickly, and that is a property of the championship rather
+than a flaw: a driver winning 84% of races does not lose a 12-race points lead. So
+`is_mathematically_decided` reports whether the lead is genuinely uncatchable, which is a
+different claim from "the model never saw them lose".
+
 ### Fitting the fuel effect
 
 The plan was to replace the assumed 0.030 s/kg with a coefficient fitted per circuit.
@@ -345,8 +386,8 @@ modes are inferred, never measured.
 | 4 | Engine: pace and degradation | done |
 | 5 | Engine: strategy and pit loss | done |
 | 6 | Engine: telemetry and corners | done |
-| 7 | Engine: simulation | next |
-| 8 | Engine: predictive models and composite ratings | |
+| 7 | Engine: simulation | done |
+| 8 | Engine: predictive models and composite ratings | next |
 | 9 | FastAPI service, caching, typed client | |
 | 10 | Next.js UI | |
 | 11 | Orchestration, incremental refresh, deploy | |

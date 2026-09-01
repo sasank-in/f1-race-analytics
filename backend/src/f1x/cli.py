@@ -554,5 +554,180 @@ def telemetry_compare(
         console.print(table)
 
 
+simulate_app = typer.Typer(help="Monte Carlo simulation.", no_args_is_help=True)
+app.add_typer(simulate_app, name="simulate")
+
+
+@simulate_app.command("race")
+def simulate_race(
+    session_id: int = typer.Argument(..., help="core.sessions.id to simulate"),
+    iterations: int = typer.Option(2000, min=100, help="Monte Carlo iterations"),
+) -> None:
+    """Compare stop strategies by simulating the race many times."""
+    import polars as pl
+    from sqlalchemy import create_engine, text
+
+    from f1x.engine.simulation.race import RaceConditions, compare_strategies
+    from f1x.engine.strategy.optimiser import MAX_STOPS, split_evenly
+    from f1x.engine.strategy.pit_loss import estimate_from_laps
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    with engine.connect() as conn:
+        laps = pl.DataFrame(
+            [
+                dict(r)
+                for r in conn.execute(
+                    text("SELECT * FROM mart.lap_metrics WHERE session_id = :s"),
+                    {"s": session_id},
+                ).mappings()
+            ]
+        )
+        stops = pl.DataFrame(
+            [
+                dict(r)
+                for r in conn.execute(
+                    text("SELECT * FROM core.pit_stops WHERE session_id = :s"),
+                    {"s": session_id},
+                ).mappings()
+            ]
+        )
+        total_laps = conn.execute(
+            text("SELECT total_laps FROM core.sessions WHERE id = :s"), {"s": session_id}
+        ).scalar()
+        degradation = conn.execute(
+            text(
+                "SELECT degradation_s_per_lap FROM mart.degradation_curves "
+                "WHERE session_id = :s ORDER BY n_stints DESC LIMIT 1"
+            ),
+            {"s": session_id},
+        ).scalar()
+        base_lap = conn.execute(
+            text(
+                "SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY lap_time_s) "
+                "FROM mart.lap_metrics WHERE session_id = :s AND is_representative"
+            ),
+            {"s": session_id},
+        ).scalar()
+
+    loss = estimate_from_laps(stops, laps, session_id=session_id)
+    if loss is None or not total_laps or degradation is None or base_lap is None:
+        console.print(
+            f"[yellow]Session {session_id} lacks the inputs to simulate.[/] "
+            "Run `f1x transform` and `f1x analyse` first."
+        )
+        raise typer.Exit(1)
+
+    conditions = RaceConditions(
+        total_laps=int(total_laps),
+        base_lap_s=float(base_lap),
+        net_pit_loss_s=loss.net_loss_s,
+        degradation_s_per_lap=float(degradation),
+    )
+    candidates = [split_evenly(int(total_laps), n + 1) for n in range(1, MAX_STOPS)]
+    comparison = compare_strategies(
+        conditions, candidates, iterations=iterations, seed=42
+    )
+
+    table = Table("stops", "stints", "median", "90% spread", "wins", title="race simulation")
+    for result in sorted(comparison.results, key=lambda r: r.median_s):
+        table.add_row(
+            str(result.n_stops),
+            "-".join(str(n) for n in result.stint_lengths),
+            f"{result.median_s:.1f}s",
+            f"{result.spread_s:.1f}s",
+            f"{comparison.win_rates[result.n_stops]:.1%}",
+        )
+    console.print(table)
+    console.print(
+        f"safety car in {comparison.results[0].safety_car_rate:.0%} of runs; "
+        + (
+            "[green]call is clear.[/]"
+            if comparison.is_decisive
+            else "[yellow]too close to call.[/]"
+        )
+    )
+
+
+@simulate_app.command("championship")
+def simulate_championship_cmd(
+    season: int = typer.Argument(..., help="Season to project"),
+    races_remaining: int = typer.Option(..., min=1, help="Races left on the calendar"),
+    iterations: int = typer.Option(5000, min=100),
+) -> None:
+    """Project title probabilities from demonstrated pace and current points."""
+    from sqlalchemy import create_engine, text
+
+    from f1x.engine.simulation.championship import DriverEntry, simulate_championship
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    with engine.connect() as conn:
+        rows = conn.execute(
+            # Points and pace are aggregated separately then joined on the driver.
+            # Joining results to rankings row-by-row multiplies each result by the
+            # number of ranking rows, inflating season points by orders of magnitude.
+            text(
+                "WITH pace AS ("
+                "  SELECT p.driver_number, avg(p.gap_to_best_s) AS gap"
+                "  FROM mart.pace_rankings p"
+                "  JOIN core.sessions s ON s.id = p.session_id"
+                "  JOIN core.events e ON e.id = s.event_id"
+                "  WHERE e.season_year = :season"
+                "  GROUP BY 1"
+                "), scored AS ("
+                "  SELECT en.driver_number, sum(coalesce(r.points, 0)) AS points"
+                "  FROM core.results r"
+                "  JOIN core.sessions s ON s.id = r.session_id"
+                "  JOIN core.events e ON e.id = s.event_id"
+                "  JOIN core.entries en"
+                "    ON en.session_id = r.session_id AND en.driver_id = r.driver_id"
+                "  WHERE e.season_year = :season"
+                "  GROUP BY 1"
+                ") "
+                "SELECT pace.driver_number, pace.gap, "
+                "       coalesce(scored.points, 0) AS points "
+                "FROM pace LEFT JOIN scored USING (driver_number) "
+                "ORDER BY pace.gap"
+            ),
+            {"season": season},
+        ).all()
+
+    if not rows:
+        console.print(f"[yellow]No pace rankings for {season}.[/] Run `f1x analyse` first.")
+        raise typer.Exit(1)
+
+    entries = [
+        DriverEntry(
+            driver_number=str(row.driver_number),
+            current_points=float(row.points or 0.0),
+            pace_gap_s=float(row.gap or 0.0),
+        )
+        for row in rows
+    ]
+    result = simulate_championship(
+        entries, races_remaining, iterations=iterations, seed=42
+    )
+
+    table = Table("driver", "points", "pace gap", "title", "expected", title="championship")
+    ordered = sorted(
+        result.title_probability, key=lambda k: -result.title_probability[k]
+    )
+    lookup = {entry.driver_number: entry for entry in entries}
+    for number in ordered[:10]:
+        entry = lookup[number]
+        table.add_row(
+            number,
+            f"{entry.current_points:.0f}",
+            f"+{entry.pace_gap_s:.3f}s",
+            f"{result.title_probability[number]:.1%}",
+            f"{result.expected_points[number]:.0f}",
+        )
+    console.print(table)
+    if not result.is_mathematically_decided:
+        console.print(
+            "[dim]Probabilities are conditional on current form; the title is not yet "
+            "mathematically decided.[/]"
+        )
+
+
 if __name__ == "__main__":
     app()
