@@ -50,7 +50,12 @@ DEGRADATION_ONSET_LAPS = 4
 # A slope beyond this is not tyre wear. It is a damaged car, a driver managing a
 # problem, or a mislabelled stint, and letting it into a degradation model would
 # poison every strategy estimate downstream.
-MAX_PLAUSIBLE_DEG_S_PER_LAP = 1.5
+#
+# 0.22 s/lap is the upper bound reported by Kolbe et al. (arXiv:2607.06495), fitted
+# across 8,278 stints and 191k laps of 2018-26 data. Their independently derived
+# figure replaces the 1.5 s/lap guess used here previously, which was loose enough
+# to admit slopes no real tyre produces.
+MAX_PLAUSIBLE_DEG_S_PER_LAP = 0.22
 
 
 @dataclass(frozen=True)
@@ -157,12 +162,19 @@ def fit_session(
     if laps.is_empty() or not required <= set(laps.columns):
         return []
 
+    # Green laps only, with in-laps and out-laps excluded. `is_representative`
+    # already drops all three, but the filter is stated explicitly because it is the
+    # standard the literature uses (Kolbe et al., arXiv:2607.06495) and a change to
+    # the validity rules should not silently alter what the regression sees.
     usable = laps.filter(
         pl.col("is_representative")
         & pl.col(time_column).is_not_null()
         & pl.col("tyre_life").is_not_null()
         & pl.col("stint").is_not_null()
     )
+    for flag in ("is_in_lap", "is_out_lap"):
+        if flag in usable.columns:
+            usable = usable.filter(~pl.col(flag).fill_null(False))
     if usable.is_empty():
         return []
 

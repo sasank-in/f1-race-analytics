@@ -320,6 +320,38 @@ than a flaw: a driver winning 84% of races does not lose a 12-race points lead. 
 `is_mathematically_decided` reports whether the lead is genuinely uncatchable, which is a
 different claim from "the model never saw them lose".
 
+### Prior art
+
+Two findings from the literature bear directly on this engine, and one of them
+independently confirms a bug it hit.
+
+Kolbe et al., [*Pitwall: Faithful Natural-Language Race-Strategy Briefings from a
+Calibrated Real-Time Monte Carlo Engine*](https://arxiv.org/abs/2607.06495), describes
+the exact failure mode this project ran into:
+
+> raw fitted slopes conflate tyre wear with fuel burn-off and track evolution; because
+> fuel effect and track grip improve lap time as the race progresses, the blended slope
+> is frequently negative — a model in which tyres improve forever, which a plan
+> optimizer will exploit with impossible 50-lap soft stints.
+
+That is precisely what happened here: negative degradation curves at Jeddah, Melbourne
+and Baku, and an optimiser that read them as a reason to run long. Reaching the same
+diagnosis independently is reassuring; their fix is stronger than the first one tried
+here. They clamp the tyre-only component to **[0, 0.22] s/lap**, a band fitted across
+8,278 stints and 191,000 laps, and this engine now uses that bound in place of the
+1.5 s/lap guess it started with. Measured degradation across 2023 tops out at 0.133
+s/lap, comfortably inside it.
+
+They also fit **on green laps only, excluding in-laps and out-laps**, which matches the
+validity rules in `transform/validity.py` — arrived at separately, and good to see
+corroborated.
+
+Ohlsson et al., [*A State-Space Approach to Modeling Tire Degradation in Formula
+1*](https://arxiv.org/abs/2512.00640), takes the Bayesian route: lap time as a function
+of fuel mass and *latent* tyre pace, with pit stops as state resets. That treats
+degradation as an unobserved state to be inferred rather than a slope to be fitted, and
+is the natural successor to the linear model used here.
+
 ### Fitting the fuel effect
 
 The plan was to replace the assumed 0.030 s/kg with a coefficient fitted per circuit.

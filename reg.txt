@@ -1,0 +1,54 @@
+Use regression-based estimation of the fuel sensitivity coefficient. This is the best approach if you want a reliable F1 lap-time correction rather than using a fixed 0.03 s/kg.
+
+Recommended methodology
+
+Model each clean lap as:
+
+$$ \boxed{ LapTime = \beta_0 +\beta_f FuelMass +\beta_t TyreAge +\beta_{t2} TyreAge^2 +\beta_c Compound +\beta_s TrackStatus +\epsilon } $$
+
+The coefficient you want is:
+
+$$ \boxed{\beta_f = \text{seconds lost per kg of fuel}} $$
+Implementation
+Collect lap-by-lap data:
+lap time
+lap number
+tyre compound
+tyre age
+pit stops
+safety-car/VSC status
+race distance
+Estimate fuel mass:
+$$ FuelMass_i = FuelStart - FuelBurnPerLap \times (Lap_i-1) $$
+Remove abnormal laps:
+pit-in/out
+Safety Car/VSC
+red flags
+major traffic incidents
+obvious driver errors
+Fit the regression model.
+Extract β_f.
+
+For example, if the model gives:
+
+$$ \beta_f=0.032 $$
+
+then use:
+
+$$ \boxed{ FuelCorrection_i=0.032\times FuelMass_i } $$
+
+and:
+
+CorrectedLapTime
+i
+	​
+
+=RawLapTime
+i
+	​
+
+−FuelCorrection
+i
+	​
+
+	​
