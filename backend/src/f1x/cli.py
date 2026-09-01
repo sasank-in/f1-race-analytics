@@ -729,5 +729,67 @@ def simulate_championship_cmd(
         )
 
 
+@analyse_app.command("fuel")
+def analyse_fuel(
+    apply: bool = typer.Option(
+        False, "--apply", help="Store fitted coefficients on core.circuits"
+    ),
+) -> None:
+    """Fit the fuel effect per circuit across seasons.
+
+    A single season cannot identify this: fuel load is derived from lap number, so the
+    two are perfectly collinear. Pooling seasons with different race lengths at the
+    same circuit breaks that.
+    """
+    from sqlalchemy import create_engine, text
+
+    from f1x.engine.pace.fuel_repository import fit_all_circuits
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    fits = fit_all_circuits(engine)
+    if not fits:
+        console.print("[yellow]No circuits with lap metrics.[/]")
+        raise typer.Exit(1)
+
+    table = Table(
+        "circuit", "effect", "seasons", "spread", "laps", "r2", title="fuel effect"
+    )
+    fitted = [fit for fit in fits if fit.fitted]
+    for fit in sorted(fits, key=lambda f: (not f.fitted, f.circuit_key)):
+        table.add_row(
+            fit.circuit_key,
+            f"{fit.effect_s_per_kg:.4f}" if fit.fitted else "[dim]default[/]",
+            str(fit.n_seasons),
+            f"{fit.lap_count_spread} laps" if fit.n_seasons > 1 else "-",
+            f"{fit.n_laps:,}",
+            f"{fit.r_squared:.3f}" if fit.fitted else "-",
+        )
+    console.print(table)
+    console.print(f"[green]{len(fitted)} of {len(fits)} circuits fitted.[/]")
+
+    if not fitted:
+        reasons = {fit.reason for fit in fits if fit.reason}
+        for reason in sorted(reasons):
+            console.print(f"[dim]  {reason}[/]")
+        return
+
+    if apply:
+        with engine.begin() as conn:
+            for fit in fitted:
+                conn.execute(
+                    text(
+                        "UPDATE core.circuits SET fuel_effect_s_per_kg = :e "
+                        "WHERE key = :k"
+                    ),
+                    {"e": fit.effect_s_per_kg, "k": fit.circuit_key},
+                )
+        console.print(
+            f"[green]Stored {len(fitted)} coefficients.[/] "
+            "Re-run `f1x transform all` to apply them."
+        )
+    else:
+        console.print("[dim]Pass --apply to store these on core.circuits.[/]")
+
+
 if __name__ == "__main__":
     app()

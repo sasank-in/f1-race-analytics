@@ -72,6 +72,13 @@ class Circuit(Base):
     )
     n_corners: Mapped[int | None] = mapped_column(SmallInteger)
 
+    # Seconds of lap time per kilogram of fuel, fitted across seasons rather than
+    # assumed. Null until enough history exists to identify it; the transform falls
+    # back to the published default in that case. See engine/pace/fuel_fit.py.
+    fuel_effect_s_per_kg: Mapped[float | None] = mapped_column(
+        Double, comment="Fitted fuel sensitivity; null means use the default"
+    )
+
 
 class Team(Base):
     __tablename__ = "teams"

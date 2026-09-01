@@ -53,7 +53,12 @@ class TransformResult:
         return int(self.lap_metrics.get_column("is_representative").sum() or 0)
 
 
-def transform_session(laps: pl.DataFrame, *, total_laps: int | None = None) -> TransformResult:
+def transform_session(
+    laps: pl.DataFrame,
+    *,
+    total_laps: int | None = None,
+    fuel_effect: float | None = None,
+) -> TransformResult:
     """Run the full per-session transform.
 
     Order matters. Validity is classified first so later steps can see which laps
@@ -62,7 +67,13 @@ def transform_session(laps: pl.DataFrame, *, total_laps: int | None = None) -> T
     with its correction attached when someone asks why it was excluded.
     """
     classified = validity.classify(laps)
-    fuelled = corrections.add_fuel_correction(classified, total_laps=total_laps)
+    # A circuit-specific coefficient when one has been fitted across seasons,
+    # otherwise the published default. See engine/pace/fuel_fit.py.
+    fuelled = corrections.add_fuel_correction(
+        classified,
+        total_laps=total_laps,
+        effect=fuel_effect if fuel_effect is not None else corrections.FUEL_EFFECT_S_PER_KG,
+    )
     with_traffic = corrections.add_traffic_state(fuelled)
 
     return TransformResult(

@@ -44,6 +44,21 @@ def session_total_laps(engine: Engine, session_id: int) -> int | None:
         ).scalar_one_or_none()
 
 
+def session_fuel_effect(engine: Engine, session_id: int) -> float | None:
+    """The circuit's fitted fuel coefficient, or None to use the default."""
+    with engine.connect() as conn:
+        return conn.execute(
+            text(
+                "SELECT c.fuel_effect_s_per_kg "
+                "FROM core.sessions s "
+                "JOIN core.events e ON e.id = s.event_id "
+                "JOIN core.circuits c ON c.id = e.circuit_id "
+                "WHERE s.id = :s"
+            ),
+            {"s": session_id},
+        ).scalar_one_or_none()
+
+
 def transform_and_store(engine: Engine, session_id: int) -> TransformResult:
     """Transform one session and replace its rows in mart.lap_metrics.
 
@@ -52,7 +67,11 @@ def transform_and_store(engine: Engine, session_id: int) -> TransformResult:
     comparison rather than silently overwriting them.
     """
     laps = load_laps(engine, session_id)
-    result = transform_session(laps, total_laps=session_total_laps(engine, session_id))
+    result = transform_session(
+        laps,
+        total_laps=session_total_laps(engine, session_id),
+        fuel_effect=session_fuel_effect(engine, session_id),
+    )
 
     with engine.begin() as conn:
         conn.execute(
