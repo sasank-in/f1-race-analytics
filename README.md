@@ -221,6 +221,57 @@ in 2 — reconstructed from lap times alone, with no access to finishing order.
 interquartile spread. Median because one damaged car should not define a compound; spread
 because a strategy model given only a centre will present a pit window as a single lap.
 
+### Strategy
+
+```bash
+.venv/Scripts/python.exe -m f1x.cli strategy session 66
+```
+
+**Pit loss** is the number every strategy call rests on, and it is not the pit-lane
+transit time. Measured at 2023 Bahrain: transit is 24.8 s, but a normal lap runs 95 s
+while the in-lap runs 101 s and the out-lap 118 s. The real cost is what those two laps
+add beyond two normal ones — **25.1 s**. Estimated from a low quantile, since a mean
+would fold in botched stops and stops made under a safety car.
+
+**The optimiser** trades pit loss against degradation. Degradation cost is quadratic in
+stint length, so splitting a long stint always pays something; the question is whether
+it pays more than the stop costs. One regulation is modelled explicitly — a dry race
+requires two compounds, so one stop is mandatory. Without that floor the optimiser
+returns zero stops at low-degradation circuits, which is internally consistent and
+against the rules.
+
+At Bahrain it ranks **2 stops (19-19-19) at 131 s** ahead of 3 stops at 135 s — the
+strategy teams actually ran, with the runner-up close enough to show the call was
+marginal rather than obvious.
+
+**Undercut windows** scan every lap for a driver within three seconds of the car ahead
+and ask whether fresh tyres would gain more than the gap before the rival responds.
+Verdicts are `undercut`, `hold`, or `marginal`; anything inside half a second either way
+is reported as marginal rather than decided.
+
+### Telemetry
+
+```bash
+.venv/Scripts/python.exe -m f1x.cli telemetry compare 66 1 20 11 20
+```
+
+Requires a session ingested *with* telemetry (the default; `--no-telemetry` skips it).
+
+**Alignment** is the step everything else depends on. Telemetry is sampled in time, but
+a lap comparison has to happen in distance — two drivers at the same moment are at
+different points on the track. Both laps are resampled onto a one-metre distance grid,
+with distance integrated from speed rather than read from the feed.
+
+**Delta time** then answers *where* a lap was won, not just by how much. A step down
+under braking is a later brake point; a rise on the straight after a corner means the
+time was actually won in the corner before.
+
+**Corner detection** works from the shape of the speed trace rather than a hardcoded
+circuit map: every corner is a local minimum in smoothed speed. That means the engine
+works on any circuit, including ones added after it was written, and adapts to layout
+changes without a data update. Per corner it reports minimum speed, entry and exit
+speeds, braking point and throttle-application point.
+
 ### Fitting the fuel effect
 
 The plan was to replace the assumed 0.030 s/kg with a coefficient fitted per circuit.
@@ -285,9 +336,9 @@ modes are inferred, never measured.
 | 2 | Ingestion: FastF1 client, session loader, backfill, QA gates | done |
 | 3 | Transform: validity, stints, pit stops, clean air | done |
 | 4 | Engine: pace and degradation | done |
-| 5 | Engine: strategy and pit loss | next |
-| 6 | Engine: telemetry and corners | |
-| 7 | Engine: simulation | |
+| 5 | Engine: strategy and pit loss | done |
+| 6 | Engine: telemetry and corners | done |
+| 7 | Engine: simulation | next |
 | 8 | Engine: predictive models and composite ratings | |
 | 9 | FastAPI service, caching, typed client | |
 | 10 | Next.js UI | |

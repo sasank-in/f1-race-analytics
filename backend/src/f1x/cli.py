@@ -432,5 +432,127 @@ def analyse_all(
     console.print(f"[green]{len(ids)} sessions analysed.[/]")
 
 
+strategy_app = typer.Typer(help="Race strategy analysis.", no_args_is_help=True)
+app.add_typer(strategy_app, name="strategy")
+
+
+@strategy_app.command("session")
+def strategy_session(
+    session_id: int = typer.Argument(..., help="core.sessions.id to analyse"),
+) -> None:
+    """Estimate pit loss and rank stop strategies for one session."""
+    import polars as pl
+    from sqlalchemy import create_engine, text
+
+    from f1x.engine.strategy.optimiser import optimise
+    from f1x.engine.strategy.pit_loss import estimate_from_laps
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    with engine.connect() as conn:
+        laps = pl.DataFrame(
+            [
+                dict(r)
+                for r in conn.execute(
+                    text("SELECT * FROM mart.lap_metrics WHERE session_id = :s"),
+                    {"s": session_id},
+                ).mappings()
+            ]
+        )
+        stops = pl.DataFrame(
+            [
+                dict(r)
+                for r in conn.execute(
+                    text("SELECT * FROM core.pit_stops WHERE session_id = :s"),
+                    {"s": session_id},
+                ).mappings()
+            ]
+        )
+        total_laps = conn.execute(
+            text("SELECT total_laps FROM core.sessions WHERE id = :s"), {"s": session_id}
+        ).scalar()
+        degradation = conn.execute(
+            text(
+                "SELECT degradation_s_per_lap FROM mart.degradation_curves "
+                "WHERE session_id = :s ORDER BY n_stints DESC LIMIT 1"
+            ),
+            {"s": session_id},
+        ).scalar()
+
+    loss = estimate_from_laps(stops, laps, session_id=session_id)
+    if loss is None:
+        console.print(f"[yellow]Not enough clean pit stops in session {session_id}.[/]")
+        raise typer.Exit(1)
+
+    summary = Table("field", "value", title=f"pit loss, session {session_id}")
+    summary.add_row("clean stops", str(loss.n_stops))
+    summary.add_row("pit-lane transit", f"{loss.pit_window_s:.1f}s")
+    summary.add_row("reference lap", f"{loss.on_track_equivalent_s:.1f}s")
+    summary.add_row("net cost of a stop", f"{loss.net_loss_s:.1f}s")
+    summary.add_row("spread", f"{loss.spread_s:.1f}s")
+    console.print(summary)
+
+    if degradation and total_laps:
+        ranked = optimise(
+            total_laps=int(total_laps),
+            slope_s_per_lap=float(degradation),
+            net_pit_loss_s=loss.net_loss_s,
+        )
+        table = Table("stops", "stints", "deg cost", "pit cost", "total", title="strategies")
+        for option in ranked:
+            table.add_row(
+                str(option.n_stops),
+                "-".join(str(n) for n in option.stint_lengths),
+                f"{option.degradation_cost_s:.0f}s",
+                f"{option.pit_cost_s:.0f}s",
+                f"{option.total_cost_s:.0f}s",
+            )
+        console.print(table)
+
+
+telemetry_app = typer.Typer(help="Telemetry comparison.", no_args_is_help=True)
+app.add_typer(telemetry_app, name="telemetry")
+
+
+@telemetry_app.command("compare")
+def telemetry_compare(
+    session_id: int = typer.Argument(...),
+    driver_a: str = typer.Argument(..., help="Reference driver number"),
+    lap_a: int = typer.Argument(...),
+    driver_b: str = typer.Argument(..., help="Comparison driver number"),
+    lap_b: int = typer.Argument(...),
+) -> None:
+    """Compare two laps: delta time and corner-by-corner minimum speeds."""
+    from sqlalchemy import create_engine
+
+    from f1x.engine.telemetry.repository import compare_laps
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    result = compare_laps(engine, session_id, (driver_a, lap_a), (driver_b, lap_b))
+    if result is None:
+        console.print(
+            "[yellow]No telemetry for one of those laps.[/] "
+            "Ingest the session with telemetry first."
+        )
+        raise typer.Exit(1)
+
+    trace, matches = result
+    console.print(
+        f"lap time delta: [cyan]{trace.final_delta_s:+.3f}s[/] "
+        f"({trace.comparison_driver} vs {trace.reference_driver})"
+    )
+
+    if matches:
+        table = Table("corner", "apex", "ref", "cmp", "delta", title="corner minimum speeds")
+        for reference, _, difference in matches:
+            table.add_row(
+                str(reference.index),
+                f"{reference.apex_distance_m:.0f}m",
+                f"{reference.min_speed_kmh:.0f}",
+                f"{reference.min_speed_kmh + difference:.0f}",
+                f"{difference:+.1f}",
+            )
+        console.print(table)
+
+
 if __name__ == "__main__":
     app()
