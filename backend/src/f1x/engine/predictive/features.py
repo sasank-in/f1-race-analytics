@@ -49,6 +49,10 @@ class FeatureSet:
         split that answers the question actually being asked: given what we knew,
         would this have predicted the races that followed?
         """
+        # An empty frame has no columns at all, so filtering it raises rather than
+        # returning nothing. Guard before touching the column.
+        if self.frame.is_empty() or "season_year" not in self.frame.columns:
+            return pl.DataFrame(), pl.DataFrame()
         train = self.frame.filter(pl.col("season_year") != holdout_season)
         test = self.frame.filter(pl.col("season_year") == holdout_season)
         return train, test
