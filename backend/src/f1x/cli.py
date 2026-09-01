@@ -420,8 +420,15 @@ def analyse_all(
         raise typer.Exit(1)
 
     table = Table("session", "stints", "reliable", "drivers", title="analysis")
+    failed: list[tuple[int, str]] = []
     for session_id in ids:
-        result = analyse_and_store(engine, session_id)
+        try:
+            result = analyse_and_store(engine, session_id)
+        except Exception as exc:  # noqa: BLE001 - one bad session must not stop the run
+            # Reported rather than swallowed: a silent failure here leaves the mart
+            # short of sessions and every downstream count quietly wrong.
+            failed.append((session_id, str(exc).splitlines()[0][:80]))
+            continue
         table.add_row(
             str(session_id),
             str(len(result.stint_fits)),
@@ -429,7 +436,11 @@ def analyse_all(
             str(len(result.ranking)),
         )
     console.print(table)
-    console.print(f"[green]{len(ids)} sessions analysed.[/]")
+    console.print(f"[green]{len(ids) - len(failed)} of {len(ids)} sessions analysed.[/]")
+    for session_id, reason in failed:
+        console.print(f"[red]session {session_id} failed:[/] {reason}")
+    if failed:
+        raise typer.Exit(1)
 
 
 strategy_app = typer.Typer(help="Race strategy analysis.", no_args_is_help=True)

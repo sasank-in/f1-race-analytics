@@ -11,6 +11,23 @@ conflates them.
 
 Fuel must already have been removed before this runs. A stint on a heavy car improves
 lap by lap as fuel burns off, which would otherwise show up as *negative* degradation.
+
+**Tyres do not degrade linearly from lap one.** Measured across roughly 10,000 laps of
+2023, the field-wide profile relative to each stint's own median is:
+
+    age  2   -0.290 s      age  8   -0.166 s
+    age  3   -0.310 s      age 10   -0.106 s
+    age  4   -0.277 s      age 13   +0.000 s
+
+A set is *fastest* around age 3, as it comes up to working temperature, and degrades
+monotonically after that. Fitting a straight line from age one therefore fits a curve,
+and a short stint that sits mostly in the early flat region comes back with a negative
+slope — tyres apparently improving with age. That is what produced the negative
+degradation curves at Jeddah, Melbourne and Baku, not the fuel correction: sweeping the
+fuel coefficient made those slopes *more* negative, not less.
+
+Laps below ``DEGRADATION_ONSET_LAPS`` are therefore excluded from the fit, and the
+intercept is reported at that age rather than at zero.
 """
 
 from __future__ import annotations
@@ -23,6 +40,12 @@ import polars as pl
 # Below this a fit is arithmetic, not evidence: three points define a line with no
 # residual left to judge it by.
 MIN_STINT_LAPS = 5
+
+# Tyre age at which degradation becomes linear. Before this the set is still coming
+# up to temperature and getting quicker, so including those laps fits a curve with a
+# line. Taken from the measured field-wide profile above, where the minimum sits at
+# age 3 and the trend is monotonic from age 4.
+DEGRADATION_ONSET_LAPS = 4
 
 # A slope beyond this is not tyre wear. It is a damaged car, a driver managing a
 # problem, or a mislabelled stint, and letting it into a degradation model would
@@ -79,6 +102,13 @@ def fit_stint(
     """Fit one stint by least squares. Returns None when there is too little to fit."""
     mask = np.isfinite(lap_times) & np.isfinite(tyre_age)
     times, age = lap_times[mask], tyre_age[mask]
+
+    # Drop the warm-up phase, where the tyre is still getting quicker. Keeping it
+    # would fit a line through a curve and can invert the sign of the slope.
+    linear = age >= DEGRADATION_ONSET_LAPS
+    if linear.sum() >= MIN_STINT_LAPS and np.unique(age[linear]).size >= 2:
+        times, age = times[linear], age[linear]
+
     if times.size < MIN_STINT_LAPS or np.unique(age).size < 2:
         return None
 

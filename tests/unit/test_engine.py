@@ -32,7 +32,8 @@ def _fit(times: list[float], age: list[float]) -> stint_model.StintFit | None:
 
 def test_regression_recovers_a_known_slope_and_intercept() -> None:
     """A stint built as 90 + 0.1 per lap must come back as pace 90, degradation 0.1."""
-    age = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    # Ages start past the warm-up cutoff so the whole stint enters the fit.
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
     times = [90.0 + 0.1 * a for a in age]
     fit = _fit(times, age)
     assert fit is not None
@@ -43,7 +44,7 @@ def test_regression_recovers_a_known_slope_and_intercept() -> None:
 
 def test_pace_is_the_zero_age_intercept_not_the_average() -> None:
     """The whole point of the split: pace excludes the degradation already accrued."""
-    age = [1.0, 2.0, 3.0, 4.0, 5.0]
+    age = [4.0, 5.0, 6.0, 7.0, 8.0]
     times = [90.0 + 0.5 * a for a in age]
     fit = _fit(times, age)
     assert fit is not None
@@ -63,7 +64,7 @@ def test_constant_tyre_age_is_not_fitted() -> None:
 
 def test_identical_lap_times_give_zero_not_undefined_r_squared() -> None:
     """Zero variance makes r-squared undefined; it must not become NaN or 1.0."""
-    fit = _fit([90.0] * 6, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+    fit = _fit([90.0] * 6, [4.0, 5.0, 6.0, 7.0, 8.0, 9.0])
     assert fit is not None
     assert fit.r_squared == 0.0
     assert fit.degradation_s_per_lap == pytest.approx(0.0, abs=1e-9)
@@ -71,14 +72,14 @@ def test_identical_lap_times_give_zero_not_undefined_r_squared() -> None:
 
 def test_implausible_degradation_is_flagged_unreliable() -> None:
     """A 3 s/lap slope is a damaged car, not tyre wear, and must not reach strategy."""
-    age = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
     fit = _fit([90.0 + 3.0 * a for a in age], age)
     assert fit is not None
     assert fit.is_reliable is False
 
 
 def test_nan_laps_are_dropped_before_fitting() -> None:
-    age = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
     times = [90.1, 90.2, float("nan"), 90.4, 90.5, 90.6, 90.7]
     fit = _fit(times, age)
     assert fit is not None
@@ -117,11 +118,19 @@ def test_session_fit_produces_one_row_per_stint() -> None:
 
 
 def test_excluded_laps_do_not_enter_a_fit() -> None:
-    frame = _session_frame().with_columns(
+    """Laps the transform rejected must not reach the regression.
+
+    The fit also drops tyre ages below DEGRADATION_ONSET_LAPS, so the surviving count
+    is what remains after both filters.
+    """
+    from f1x.engine.pace.stint_model import DEGRADATION_ONSET_LAPS
+
+    frame = _session_frame(n_laps=14).with_columns(
         is_representative=pl.col("lap_number") > 2  # first two laps excluded
     )
     fits = fit_session(frame)
-    assert all(fit.n_laps == 6 for fit in fits)
+    expected = 14 - 2 - max(0, DEGRADATION_ONSET_LAPS - 3)
+    assert all(fit.n_laps == expected for fit in fits)
 
 
 def test_empty_session_fits_nothing() -> None:
@@ -272,3 +281,29 @@ def test_predicted_loss_never_goes_negative() -> None:
     """Ageing a tyre cannot hand time back, whatever the fit says."""
     curve = build_curves(_fits_frame([-0.02, -0.015, -0.01]))[0]
     assert curve.loss_after(20) == 0.0
+
+
+def test_warm_up_laps_do_not_invert_the_degradation_sign() -> None:
+    """The bug this cutoff exists to prevent.
+
+    A stint that gets quicker for its first few laps and then degrades is a curve.
+    Fitting a line through the whole thing can return a negative slope — tyres
+    apparently improving with age — which is what produced negative degradation
+    curves at Jeddah, Melbourne and Baku.
+    """
+    # Fast improvement to age 4, then steady degradation.
+    age = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    times = [91.0, 90.4, 90.1, 90.0, 90.1, 90.2, 90.3, 90.4, 90.5]
+    fit = _fit(times, age)
+    assert fit is not None
+    assert fit.degradation_s_per_lap > 0, "the linear phase degrades, so the slope must"
+
+
+def test_a_stint_too_short_to_clear_warm_up_still_fits() -> None:
+    """Dropping warm-up must not silently discard every short stint."""
+    from f1x.engine.pace.stint_model import DEGRADATION_ONSET_LAPS
+
+    age = [float(i) for i in range(1, DEGRADATION_ONSET_LAPS + 2)]
+    times = [90.0 + 0.1 * a for a in age]
+    fit = _fit(times, age)
+    assert fit is not None
