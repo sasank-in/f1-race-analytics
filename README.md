@@ -204,8 +204,8 @@ modes are inferred, never measured.
 |---|---|---|
 | 0 | Tooling, Docker stack, config, CI, test harness | done |
 | 1 | Schema, migrations, hypertables, continuous aggregates | done |
-| 2 | Ingestion: FastF1 client, session loader, backfill, QA gates | in progress |
-| 3 | Transform: validity, stints, pit stops, clean air | |
+| 2 | Ingestion: FastF1 client, session loader, backfill, QA gates | done |
+| 3 | Transform: validity, stints, pit stops, clean air | next |
 | 4 | Engine: pace and degradation | |
 | 5 | Engine: strategy and pit loss | |
 | 6 | Engine: telemetry and corners | |
