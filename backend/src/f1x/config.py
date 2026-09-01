@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     )
 
     env: str = "local"
-    debug: bool = True
+    # DEBUG is commonly injected by shells and IDEs with non-boolean values such as
+    # "release". Scope this setting to the application namespace to avoid collisions.
+    debug: bool = Field(default=True, validation_alias="F1X_DEBUG")
 
     # --- database -------------------------------------------------------
     postgres_user: str = "f1x"

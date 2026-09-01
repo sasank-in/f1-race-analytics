@@ -15,6 +15,7 @@ from f1x.models.core import (
     Team,
 )
 from f1x.models.mart import LapMetric
+from f1x.models.raw import ingest_runs
 from f1x.models.timeseries import Position, RaceControl, Telemetry, Weather
 
 # Tables converted to hypertables by the migration, with the column to partition on
@@ -46,4 +47,5 @@ __all__ = [
     "Team",
     "Telemetry",
     "Weather",
+    "ingest_runs",
 ]

@@ -144,6 +144,23 @@ Docker runs the **database only** — Python and Next.js run natively, so debugg
 reload behave normally. PostgreSQL maps to host port **5433** to avoid colliding with a
 local PostgreSQL install; change `DB_PORT` in `.env` if that does not apply.
 
+### Ingestion
+
+Phase 2 provides a validated, repeatable FastF1 ingestion command. It records an
+append-only source manifest in `raw.ingest_runs` before replacing the corresponding
+conformed session rows in `core`.
+
+```bash
+# One race, without the large telemetry/position traces
+.venv/Scripts/python.exe -m f1x.cli ingest session 2024 1 R --no-telemetry
+
+# A contiguous range of race sessions (continue after individual failures)
+.venv/Scripts/python.exe -m f1x.cli ingest backfill 2024 --last-round 24
+```
+
+The default loads telemetry. Use `--no-telemetry` for a quick timing, results, weather,
+and race-control load; rerun the same session without that flag to populate telemetry.
+
 ## Development
 
 ```bash
@@ -187,7 +204,7 @@ modes are inferred, never measured.
 |---|---|---|
 | 0 | Tooling, Docker stack, config, CI, test harness | done |
 | 1 | Schema, migrations, hypertables, continuous aggregates | done |
-| 2 | Ingestion: FastF1 client, session loader, backfill, QA gates | next |
+| 2 | Ingestion: FastF1 client, session loader, backfill, QA gates | in progress |
 | 3 | Transform: validity, stints, pit stops, clean air | |
 | 4 | Engine: pace and degradation | |
 | 5 | Engine: strategy and pit loss | |

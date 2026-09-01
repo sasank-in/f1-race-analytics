@@ -8,9 +8,21 @@ from sqlalchemy import text
 pytestmark = pytest.mark.integration
 
 EXPECTED_CORE_TABLES = {
-    "seasons", "circuits", "teams", "drivers", "events", "sessions", "entries",
-    "results", "laps", "stints", "pit_stops",
-    "telemetry", "positions", "weather", "race_control",
+    "seasons",
+    "circuits",
+    "teams",
+    "drivers",
+    "events",
+    "sessions",
+    "entries",
+    "results",
+    "laps",
+    "stints",
+    "pit_stops",
+    "telemetry",
+    "positions",
+    "weather",
+    "race_control",
 }
 EXPECTED_HYPERTABLES = {"telemetry", "positions", "weather", "race_control"}
 COMPRESSED = {"telemetry", "positions"}
@@ -39,11 +51,18 @@ def test_mart_lap_metrics_exists(db_engine) -> None:
     assert "lap_metrics" in found
 
 
-def test_hypertables_registered(db_engine) -> None:
+def test_raw_ingest_runs_exists(db_engine) -> None:
     with db_engine.connect() as conn:
         found = _scalars(
-            conn, "SELECT hypertable_name FROM timescaledb_information.hypertables"
+            conn,
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'raw'",
         )
+    assert "ingest_runs" in found
+
+
+def test_hypertables_registered(db_engine) -> None:
+    with db_engine.connect() as conn:
+        found = _scalars(conn, "SELECT hypertable_name FROM timescaledb_information.hypertables")
     assert found >= EXPECTED_HYPERTABLES
 
 
@@ -119,16 +138,12 @@ def test_cascade_delete_from_session(db_engine) -> None:
             )
         ).scalar_one()
         session_id = conn.execute(
-            text(
-                "INSERT INTO core.sessions (event_id, kind) "
-                "VALUES (:e, 'R') RETURNING id"
-            ),
+            text("INSERT INTO core.sessions (event_id, kind) VALUES (:e, 'R') RETURNING id"),
             {"e": event_id},
         ).scalar_one()
         conn.execute(
             text(
-                "INSERT INTO core.laps (session_id, driver_number, lap_number) "
-                "VALUES (:s, '44', 1)"
+                "INSERT INTO core.laps (session_id, driver_number, lap_number) VALUES (:s, '44', 1)"
             ),
             {"s": session_id},
         )

@@ -86,8 +86,7 @@ def doctor() -> None:
     console.print(table)
     if not ok:
         console.print(
-            "\n[yellow]Start the stack with:[/] "
-            "docker compose -f docker/docker-compose.yml up -d"
+            "\n[yellow]Start the stack with:[/] docker compose -f docker/docker-compose.yml up -d"
         )
         raise typer.Exit(1)
     console.print("\n[green]All checks passed.[/]")
@@ -95,6 +94,83 @@ def doctor() -> None:
 
 db_app = typer.Typer(help="Database inspection.", no_args_is_help=True)
 app.add_typer(db_app, name="db")
+
+
+ingest_app = typer.Typer(help="Load and validate Formula 1 session data.", no_args_is_help=True)
+app.add_typer(ingest_app, name="ingest")
+
+
+def _ingest_one(year: int, round_number: int, kind: str, telemetry: bool) -> None:
+    """Load and persist one session, keeping CLI commands deliberately thin."""
+    from f1x.ingest import FastF1Client, SessionRequest
+    from f1x.ingest.loader import SessionLoader
+    from f1x.repo import create_session_factory
+
+    settings = get_settings()
+    engine, sessions = create_session_factory(settings)
+    try:
+        request = SessionRequest(year, round_number, kind, telemetry=telemetry)
+        source = FastF1Client(settings).load(request)
+        summary = SessionLoader(sessions).persist(request, source)
+    finally:
+        engine.dispose()
+
+    table = Table("field", "value", title=f"{year} round {round_number} {kind} ingested")
+    for field, value in (
+        ("session id", summary.session_id),
+        ("drivers", summary.drivers),
+        ("laps", summary.laps),
+        ("telemetry samples", summary.telemetry),
+        ("position samples", summary.positions),
+        ("weather samples", summary.weather),
+        ("race-control messages", summary.race_control),
+        ("timed laps", summary.quality.timed_laps),
+    ):
+        table.add_row(str(field), f"{value:,}" if isinstance(value, int) else str(value))
+    console.print(table)
+    for warning in summary.quality.warnings:
+        console.print(f"[yellow]warning:[/] {warning}")
+
+
+@ingest_app.command("session")
+def ingest_session(
+    year: int = typer.Argument(..., min=1950),
+    round_number: int = typer.Argument(..., min=1),
+    kind: str = typer.Argument(..., help="FP1, FP2, FP3, Q, SQ, S, or R"),
+    telemetry: bool = typer.Option(True, "--telemetry/--no-telemetry"),
+) -> None:
+    """Ingest one fully-loaded event session."""
+    try:
+        _ingest_one(year, round_number, kind.upper(), telemetry)
+    except (ValueError, RuntimeError) as exc:
+        console.print(f"[red]ingestion failed:[/] {exc}")
+        raise typer.Exit(1) from exc
+
+
+@ingest_app.command("backfill")
+def backfill(
+    year: int = typer.Argument(..., min=1950),
+    first_round: int = typer.Option(1, min=1),
+    last_round: int = typer.Option(..., min=1, help="Last completed round to load"),
+    kind: str = typer.Option("R", help="Session kind to ingest for each round"),
+    telemetry: bool = typer.Option(True, "--telemetry/--no-telemetry"),
+) -> None:
+    """Backfill a contiguous range while continuing past individual failed rounds."""
+    if last_round < first_round:
+        raise typer.BadParameter("last_round must be greater than or equal to first_round")
+    failed: list[int] = []
+    for round_number in range(first_round, last_round + 1):
+        try:
+            _ingest_one(year, round_number, kind.upper(), telemetry)
+        except (ValueError, RuntimeError) as exc:
+            failed.append(round_number)
+            console.print(f"[red]round {round_number} failed:[/] {exc}")
+    if failed:
+        console.print(f"[yellow]backfill completed with failures:[/] {', '.join(map(str, failed))}")
+        raise typer.Exit(1)
+    console.print(
+        f"[green]backfill complete:[/] {year}, rounds {first_round}-{last_round}, {kind.upper()}"
+    )
 
 
 @db_app.command("status")
