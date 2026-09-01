@@ -334,9 +334,25 @@ thirty times the physical value.
 This is an identification problem, not a numerical one. `engine/pace/fuel_model.py`
 therefore fits the coefficient, rejects it against physical bounds, and falls back to the
 default — a rule of thumb applied honestly beats a fitted number that is confidently
-wrong on every lap. Isolating mass needs fuel variation independent of race progress:
-the same circuit across seasons with different race lengths, or practice runs where teams
-deliberately vary load. Both are future work.
+wrong on every lap.
+
+**The cross-season fit** in `engine/pace/fuel_fit.py` resolves it. A circuit run over 57
+laps one year and 53 the next carries *different fuel loads at the same lap number*, and
+that decoupling is what makes mass identifiable. Season and per-stint baselines are
+absorbed by dummy columns so the fuel term cannot soak them up instead.
+
+```bash
+.venv/Scripts/python.exe -m f1x.cli analyse fuel            # inspect
+.venv/Scripts/python.exe -m f1x.cli analyse fuel --apply    # store on core.circuits
+```
+
+The estimator refuses rather than guesses. Single-season data, and two seasons of
+identical race length, both return the published default with the reason attached —
+equal distances reproduce the original collinearity exactly. A fit outside physical
+bounds is discarded, never applied.
+
+Fitted coefficients land on `core.circuits.fuel_effect_s_per_kg` and the transform picks
+them up automatically, falling back to the default for circuits without enough history.
 
 ## Development
 

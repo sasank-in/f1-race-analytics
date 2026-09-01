@@ -791,5 +791,96 @@ def analyse_fuel(
         console.print("[dim]Pass --apply to store these on core.circuits.[/]")
 
 
+@analyse_app.command("quality")
+def analyse_quality(
+    season: int | None = typer.Option(None, help="Restrict to one season"),
+) -> None:
+    """Report how well the fuel correction performed, session by session.
+
+    A residual positive trend means over-correction; negative means the burn-off is
+    still showing through. Negative degradation slopes are the loud failure: tyres
+    cannot get faster with age.
+    """
+    import polars as pl
+    from sqlalchemy import create_engine, text
+
+    from f1x.engine.pace.diagnostics import assess_correction, assess_degradation
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    all_sessions = text(
+        "SELECT s.id, c.key FROM core.sessions s "
+        "JOIN core.events e ON e.id = s.event_id "
+        "LEFT JOIN core.circuits c ON c.id = e.circuit_id ORDER BY e.season_year, e.round"
+    )
+    one_season = text(
+        "SELECT s.id, c.key FROM core.sessions s "
+        "JOIN core.events e ON e.id = s.event_id "
+        "LEFT JOIN core.circuits c ON c.id = e.circuit_id "
+        "WHERE e.season_year = :season ORDER BY e.round"
+    )
+    with engine.connect() as conn:
+        rows = (
+            conn.execute(one_season, {"season": season})
+            if season
+            else conn.execute(all_sessions)
+        )
+        sessions = [(r[0], r[1]) for r in rows]
+
+        table = Table("circuit", "raw", "corrected", "removed", "verdict",
+                      title="fuel correction quality")
+        counts: dict[str, int] = {}
+        for session_id, circuit in sessions:
+            laps = pl.DataFrame(
+                [
+                    dict(r)
+                    for r in conn.execute(
+                        text("SELECT * FROM mart.lap_metrics WHERE session_id = :s"),
+                        {"s": session_id},
+                    ).mappings()
+                ]
+            )
+            quality = assess_correction(
+                laps, session_id=session_id, circuit_key=circuit
+            )
+            if quality is None:
+                continue
+            counts[quality.verdict] = counts.get(quality.verdict, 0) + 1
+            colour = {
+                "good": "green", "improved": "cyan",
+                "weak": "yellow", "over-corrected": "red",
+            }[quality.verdict]
+            table.add_row(
+                circuit or str(session_id),
+                f"{quality.raw_trend:+.3f}",
+                f"{quality.corrected_trend:+.3f}",
+                f"{quality.improvement:.0%}",
+                f"[{colour}]{quality.verdict}[/]",
+            )
+
+        curves = pl.DataFrame(
+            [
+                dict(r)
+                for r in conn.execute(
+                    text("SELECT degradation_s_per_lap FROM mart.degradation_curves")
+                ).mappings()
+            ]
+        )
+
+    console.print(table)
+    console.print(" ".join(f"{verdict}={n}" for verdict, n in sorted(counts.items())))
+
+    health = assess_degradation(curves)
+    if health.is_healthy:
+        console.print(
+            f"[green]All {health.n_curves} degradation curves are physically possible.[/]"
+        )
+    else:
+        console.print(
+            f"[red]{health.n_negative} of {health.n_curves} degradation curves have a "
+            f"negative slope[/] — tyres cannot get faster with age, so the fuel "
+            f"correction is too strong at those circuits."
+        )
+
+
 if __name__ == "__main__":
     app()
