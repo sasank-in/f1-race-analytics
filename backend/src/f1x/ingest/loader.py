@@ -62,6 +62,23 @@ def _value(record: Any, name: str, default: Any = None) -> Any:
     return default if value is None or pd.isna(value) else value
 
 
+def _compound(value: Any) -> str | None:
+    """Normalise a tyre compound to the core.compound enum, or None.
+
+    FastF1 writes the literal string ``'None'`` (not a null) when it cannot determine
+    which compound a lap ran on — 35 laps of the 2023 Canadian GP, for example. Passed
+    through unchanged it fails the enum cast and aborts the whole session insert, so
+    the sentinel is mapped to SQL NULL here at the boundary.
+    """
+    raw = _value(value, "Compound") if not isinstance(value, str) else value
+    if raw is None:
+        return None
+    text_value = str(raw).strip().upper()
+    if text_value in {"", "NONE", "NAN", "UNKNOWN"}:
+        return None
+    return text_value
+
+
 def _seconds(value: Any) -> float | None:
     if value is None or pd.isna(value):
         return None
@@ -422,7 +439,7 @@ class SessionLoader:
                     "speed_fl": _number(_value(row, "SpeedFL")),
                     "speed_st": _number(_value(row, "SpeedST")),
                     "stint": _integer(_value(row, "Stint")),
-                    "compound": _value(row, "Compound"),
+                    "compound": _compound(row),
                     "tyre_life": _number(_value(row, "TyreLife")),
                     "fresh_tyre": _boolean(_value(row, "FreshTyre")),
                     "pit_in_s": _seconds(_value(row, "PitInTime")),

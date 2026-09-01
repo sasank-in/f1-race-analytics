@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from f1x.config import ENGINE_VERSION, get_settings
+
+if TYPE_CHECKING:
+    from sqlalchemy import Engine
+
+    from f1x.transform import TransformResult
 
 app = typer.Typer(
     name="f1x",
@@ -240,6 +247,88 @@ def db_rowcounts() -> None:
             n = conn.execute(text(f"SELECT count(*) FROM {qualified}")).scalar_one()  # noqa: S608
             table.add_row(name, f"{n:,}")
     console.print(table)
+
+
+transform_app = typer.Typer(
+    help="Derive analysis-ready facts from ingested laps.", no_args_is_help=True
+)
+app.add_typer(transform_app, name="transform")
+
+
+def _transform_one(engine: Engine, session_id: int) -> TransformResult:
+    from f1x.transform.repository import transform_and_store
+
+    return transform_and_store(engine, session_id)
+
+
+@transform_app.command("session")
+def transform_session_cmd(
+    session_id: int = typer.Argument(..., help="core.sessions.id to transform"),
+) -> None:
+    """Transform one session into mart.lap_metrics, stints and pit stops."""
+    from sqlalchemy import create_engine
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    result = _transform_one(engine, session_id)
+
+    table = Table("field", "value", title=f"session {session_id} transformed")
+    table.add_row("representative laps", f"{result.representative_laps:,}")
+    table.add_row("lap metrics", f"{len(result.lap_metrics):,}")
+    table.add_row("stints", f"{len(result.stints):,}")
+    table.add_row("pit stops", f"{len(result.pit_stops):,}")
+    table.add_row("engine version", result.engine_version)
+    console.print(table)
+
+    if result.exclusions:
+        reasons = Table("exclusion", "laps", title="why laps were excluded")
+        for reason, count in sorted(result.exclusions.items(), key=lambda kv: -kv[1]):
+            reasons.add_row(reason, f"{count:,}")
+        console.print(reasons)
+
+
+@transform_app.command("all")
+def transform_all(
+    season: int | None = typer.Option(None, help="Restrict to one season"),
+) -> None:
+    """Transform every ingested session, or every session in one season."""
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    # Two literal statements rather than one assembled string: the season filter
+    # changes the shape of the query, not just a bound value.
+    all_sessions = text(
+        "SELECT s.id FROM core.sessions s JOIN core.events e ON e.id = s.event_id "
+        "ORDER BY e.season_year, e.round, s.kind"
+    )
+    one_season = text(
+        "SELECT s.id FROM core.sessions s JOIN core.events e ON e.id = s.event_id "
+        "WHERE e.season_year = :season "
+        "ORDER BY e.season_year, e.round, s.kind"
+    )
+    with engine.connect() as conn:
+        rows = (
+            conn.execute(one_season, {"season": season})
+            if season
+            else conn.execute(all_sessions)
+        )
+        ids = [r[0] for r in rows]
+
+    if not ids:
+        console.print("[yellow]No ingested sessions to transform.[/]")
+        raise typer.Exit(1)
+
+    table = Table("session", "laps", "representative", title="transform")
+    total = 0
+    for session_id in ids:
+        result = _transform_one(engine, session_id)
+        total += result.representative_laps
+        table.add_row(
+            str(session_id),
+            f"{len(result.lap_metrics):,}",
+            f"{result.representative_laps:,}",
+        )
+    console.print(table)
+    console.print(f"[green]{len(ids)} sessions, {total:,} representative laps.[/]")
 
 
 if __name__ == "__main__":
