@@ -161,6 +161,21 @@ conformed session rows in `core`.
 The default loads telemetry. Use `--no-telemetry` for a quick timing, results, weather,
 and race-control load; rerun the same session without that flag to populate telemetry.
 
+### Transform
+
+Ingestion stores what the feed reported. The transform derives what it means: which laps
+count, what they are worth once fuel is accounted for, and what the stint and pit-stop
+structure was.
+
+```bash
+.venv/Scripts/python.exe -m f1x.cli transform session 66   # one session
+.venv/Scripts/python.exe -m f1x.cli transform all --season 2023
+```
+
+Output lands in `mart.lap_metrics`, stamped with `engine_version`, alongside derived
+`core.stints` and `core.pit_stops`. Every excluded lap records *why* it was excluded, so
+a surprising pace number can always be traced back to its sample.
+
 ## Development
 
 ```bash
@@ -205,8 +220,8 @@ modes are inferred, never measured.
 | 0 | Tooling, Docker stack, config, CI, test harness | done |
 | 1 | Schema, migrations, hypertables, continuous aggregates | done |
 | 2 | Ingestion: FastF1 client, session loader, backfill, QA gates | done |
-| 3 | Transform: validity, stints, pit stops, clean air | next |
-| 4 | Engine: pace and degradation | |
+| 3 | Transform: validity, stints, pit stops, clean air | done |
+| 4 | Engine: pace and degradation | next |
 | 5 | Engine: strategy and pit loss | |
 | 6 | Engine: telemetry and corners | |
 | 7 | Engine: simulation | |
