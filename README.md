@@ -176,17 +176,21 @@ Output lands in `mart.lap_metrics`, stamped with `engine_version`, alongside der
 `core.stints` and `core.pit_stops`. Every excluded lap records *why* it was excluded, so
 a surprising pace number can always be traced back to its sample.
 
-Across the full 2023 season — 22 races, 24,420 laps — 80% of laps survive filtering.
+Across 2022 and 2023 — 44 races, 47,997 laps, 16.2 M telemetry samples — 80% of laps
+survive filtering.
 The remainder are attributed: 11% flagged inaccurate by the source, 3% run under yellow,
 2.6% outliers, 1.8% untimed, 1.6% deleted by the stewards.
 
-Two checks worth knowing, because they validate the model rather than the plumbing:
+Three checks worth knowing, because they validate the model rather than the plumbing:
 
 - Lap time against lap number correlates **-0.615** on average before fuel correction and
   **0.196** in absolute terms after, with 15 of 22 races landing inside ±0.2. The
   correction removes the burn-off trend it is meant to remove.
 - Mean stint length orders **SOFT 11.3 < MEDIUM 17.1 < HARD 25.4** laps. Nothing in the
   code enforces that ordering; it falls out of the derivation, which is the useful signal.
+- Fitted degradation across 98 compound curves orders **INTERMEDIATE 0.162 > SOFT 0.074
+  > MEDIUM 0.055 > HARD 0.048** s/lap, again unenforced, and peaks at 0.175 s/lap —
+  inside the [0, 0.22] band published by Kolbe et al.
 
 The two races that over-correct do so because the fuel coefficient is a uniform
 0.030 s/kg. See **Fitting the fuel effect** below for why fitting it per circuit turns
@@ -278,6 +282,12 @@ circuit map: every corner is a local minimum in smoothed speed. That means the e
 works on any circuit, including ones added after it was written, and adapts to layout
 changes without a data update. Per corner it reports minimum speed, entry and exit
 speeds, braking point and throttle-application point.
+
+The sharpest check on all of this is lap distance, integrated from speed alone with no
+circuit data involved. Across eight circuits it lands within **0.9–2.2 %** of the true
+length — Monaco 3,263 m against 3,337, Spa 6,918 against 7,004 — and the error is
+consistently *negative*, the signature of trapezoidal integration under-counting during
+acceleration rather than random noise.
 
 ### Simulation
 

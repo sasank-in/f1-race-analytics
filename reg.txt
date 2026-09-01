@@ -1,54 +1,183 @@
-Use regression-based estimation of the fuel sensitivity coefficient. This is the best approach if you want a reliable F1 lap-time correction rather than using a fixed 0.03 s/kg.
+F1 FUEL-CORRECTED LAP TIME — RECOMMENDED METHODOLOGY
 
-Recommended methodology
+Objective
+---------
+Estimate the effect of fuel mass on F1 lap time and use the estimated
+coefficient to calculate fuel-corrected lap times.
 
+Recommended Approach
+---------------------
+Use regression-based estimation of the fuel sensitivity coefficient.
+This is preferred over using a fixed 0.03 seconds/kg value because it
+allows the fuel effect to be estimated from the actual F1 dataset while
+accounting for tyre degradation, compound, and track conditions.
+
+1. Regression Model
+-------------------
 Model each clean lap as:
 
-$$ \boxed{ LapTime = \beta_0 +\beta_f FuelMass +\beta_t TyreAge +\beta_{t2} TyreAge^2 +\beta_c Compound +\beta_s TrackStatus +\epsilon } $$
+LapTime =
+    beta_0
+    + beta_f * FuelMass
+    + beta_t * TyreAge
+    + beta_t2 * TyreAge^2
+    + beta_c * Compound
+    + beta_s * TrackStatus
+    + error
 
-The coefficient you want is:
+The coefficient of interest is:
 
-$$ \boxed{\beta_f = \text{seconds lost per kg of fuel}} $$
-Implementation
-Collect lap-by-lap data:
-lap time
-lap number
-tyre compound
-tyre age
-pit stops
-safety-car/VSC status
-race distance
-Estimate fuel mass:
-$$ FuelMass_i = FuelStart - FuelBurnPerLap \times (Lap_i-1) $$
-Remove abnormal laps:
-pit-in/out
-Safety Car/VSC
-red flags
-major traffic incidents
-obvious driver errors
-Fit the regression model.
-Extract β_f.
+beta_f = seconds lost per kg of fuel
 
-For example, if the model gives:
+2. Required Lap-Level Data
+--------------------------
+Collect the following data for every lap:
 
-$$ \beta_f=0.032 $$
+- Lap time
+- Lap number
+- Tyre compound
+- Tyre age
+- Pit-stop information
+- Safety Car / VSC status
+- Race distance
 
-then use:
+3. Estimate Fuel Mass
+---------------------
+Estimate the fuel mass at each lap using:
 
-$$ \boxed{ FuelCorrection_i=0.032\times FuelMass_i } $$
+FuelMass_i =
+    FuelStart - FuelBurnPerLap * (Lap_i - 1)
 
-and:
+If the starting fuel is approximately known and the expected fuel burn
+per lap can be estimated:
 
-CorrectedLapTime
-i
-	​
+FuelBurnPerLap =
+    FuelStart / NumberOfRaceLaps
 
-=RawLapTime
-i
-	​
+The fuel estimate should be treated as an approximation unless actual
+fuel telemetry is available.
 
-−FuelCorrection
-i
-	​
+4. Remove Abnormal Laps
+-----------------------
+Before fitting the regression, remove or exclude laps significantly
+affected by:
 
-	​
+- Pit-in laps
+- Pit-out laps
+- Safety Car
+- Virtual Safety Car
+- Red flags
+- Major traffic incidents
+- Obvious driver errors
+- Other abnormal race conditions
+
+The goal is to make the regression primarily represent normal racing
+performance.
+
+5. Fit the Regression
+---------------------
+Fit the regression model using the cleaned lap-level dataset.
+
+The resulting fuel coefficient is:
+
+EstimatedFuelCoefficient = beta_f
+
+For example:
+
+beta_f = 0.032 seconds/kg/lap
+
+This means that an additional 1 kg of fuel is estimated to increase
+the lap time by approximately 0.032 seconds.
+
+6. Calculate Fuel Correction
+----------------------------
+For each lap:
+
+FuelCorrection_i =
+    beta_f * FuelMass_i
+
+7. Calculate Fuel-Corrected Lap Time
+------------------------------------
+Apply:
+
+CorrectedLapTime_i =
+    RawLapTime_i - FuelCorrection_i
+
+Example
+-------
+Suppose:
+
+Raw lap time = 90.800 seconds
+Fuel mass = 50 kg
+Estimated fuel coefficient = 0.032 seconds/kg/lap
+
+Then:
+
+FuelCorrection =
+    0.032 * 50
+    = 1.600 seconds
+
+Therefore:
+
+CorrectedLapTime =
+    90.800 - 1.600
+    = 89.200 seconds
+
+8. Important Baseline
+---------------------
+A value around 0.03 seconds/kg/lap can be used as an initial sanity
+check, but it should NOT be treated as a universal F1 constant.
+
+The final coefficient should be estimated from the actual dataset.
+
+Recommended Pipeline
+--------------------
+Raw F1 Lap Data
+       |
+       v
+Estimate Fuel Mass
+       |
+       v
+Remove Abnormal Laps
+       |
+       v
+Prepare Tyre / Compound / Track Variables
+       |
+       v
+Fit Regression Model
+       |
+       v
+Extract beta_f
+       |
+       v
+Calculate Fuel Correction
+       |
+       v
+Generate Fuel-Corrected Lap Times
+
+Final Formula
+-------------
+The complete correction is:
+
+CorrectedLapTime =
+    RawLapTime - (EstimatedFuelCoefficient * FuelMass)
+
+Recommended Default
+-------------------
+Use:
+
+EstimatedFuelCoefficient = 0.030 seconds/kg/lap
+
+ONLY as an initial reference or sanity-check value.
+
+For the final analysis, replace 0.030 with the coefficient estimated
+from the regression model fitted to the cleaned F1 lap dataset.
+
+Key Principle
+-------------
+Do not estimate fuel sensitivity simply by comparing an early-race lap
+with a late-race lap. Lap time is also affected by tyre degradation,
+compound, track evolution, traffic, and race conditions.
+
+Regression-based estimation is therefore the recommended methodology
+for producing a defensible fuel-corrected F1 lap-time analysis.
