@@ -27,6 +27,7 @@ METRIC_COLUMNS = (
     "exclusion_reason",
     "fuel_corrected_s",
     "fuel_load_kg",
+    "evolution_corrected_s",
     "gap_ahead_s",
     "gap_behind_s",
     "is_clean_air",
@@ -74,7 +75,10 @@ def transform_session(
         total_laps=total_laps,
         effect=fuel_effect if fuel_effect is not None else corrections.FUEL_EFFECT_S_PER_KG,
     )
-    with_traffic = corrections.add_traffic_state(fuelled)
+    # Track evolution after fuel: the grip trend is measured on fuel-corrected times,
+    # so removing fuel first is a prerequisite.
+    evolved = corrections.add_evolution_correction(fuelled)
+    with_traffic = corrections.add_traffic_state(evolved)
 
     return TransformResult(
         lap_metrics=_project(with_traffic),

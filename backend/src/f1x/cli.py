@@ -877,8 +877,9 @@ def analyse_quality(
     else:
         console.print(
             f"[red]{health.n_negative} of {health.n_curves} degradation curves have a "
-            f"negative slope[/] — tyres cannot get faster with age, so the fuel "
-            f"correction is too strong at those circuits."
+            f"negative slope[/] — tyres cannot get faster with age. The residual is "
+            f"track evolution the linear model does not fully remove; see "
+            f"transform/corrections.py."
         )
 
 

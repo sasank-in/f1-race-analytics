@@ -19,6 +19,7 @@ data — good enough to rank pace, not precise enough to quote to the millisecon
 
 from __future__ import annotations
 
+import numpy as np
 import polars as pl
 from polars.datatypes import DataTypeClass
 
@@ -139,4 +140,75 @@ def add_traffic_state(
             .otherwise(pl.col("gap_ahead_s") > gap_threshold_s)
         )
         .sort(["session_id", "driver_number", "lap_number"])
+    )
+
+
+# Track evolution: rubber laid into the surface improves grip as a race goes on.
+# Measured at Jeddah 2023, a driver's fuel-corrected times fall from 94.7 s to 92.6 s
+# across eight laps of a single stint — a gain that exceeds tyre wear entirely.
+#
+# This is why several low-degradation circuits fit *negative* degradation slopes. It is
+# not an artefact of the fuel correction: lowering the fuel coefficient makes those
+# slopes more negative, not less, because the residual improvement is real.
+#
+# Removing it matters because the degradation model attributes everything left in a
+# stint's slope to the tyre. With evolution still in the residual, a circuit that rubbers
+# in quickly looks like it has tyres that improve with age.
+
+
+def estimate_evolution(laps: pl.DataFrame, *, time_column: str = "fuel_corrected_s") -> float:
+    """Seconds per lap the track improves, estimated across the whole session.
+
+    Fitted on the *field*, not per driver: every car benefits from the same surface, so
+    a session-wide trend separates evolution from any individual's tyre behaviour.
+
+    Deliberately one number for the session. Evolution is strongest early and flattens
+    once the racing line is rubbered in, but fitting that curve needs more signal than
+    a single race provides, and a wrong curve is worse than a right line.
+    """
+    required = {"lap_number", time_column}
+    if laps.is_empty() or not required <= set(laps.columns):
+        return 0.0
+
+    usable = laps.filter(pl.col("is_representative") & pl.col(time_column).is_not_null())
+    if len(usable) < 50:
+        return 0.0
+
+    # Median per lap number, so one driver's traffic cannot tilt the trend.
+    per_lap = (
+        usable.group_by("lap_number")
+        .agg(median_time=pl.col(time_column).median())
+        .sort("lap_number")
+    )
+    if len(per_lap) < 10:
+        return 0.0
+
+    lap = per_lap.get_column("lap_number").to_numpy().astype(float)
+    times = per_lap.get_column("median_time").to_numpy().astype(float)
+    slope = float(np.polyfit(lap, times, 1)[0])
+
+    # Only a *negative* slope is evolution. A positive session-wide trend means the
+    # field is degrading faster than the track improves, which belongs to the tyre
+    # model, not here.
+    return min(0.0, slope)
+
+
+def add_evolution_correction(
+    laps: pl.DataFrame, *, time_column: str = "fuel_corrected_s"
+) -> pl.DataFrame:
+    """Add ``evolution_corrected_s``: fuel-corrected time with the grip trend removed.
+
+    After this, a stint's remaining slope is attributable to the tyre rather than to
+    the track surface improving underneath it.
+    """
+    if laps.is_empty() or time_column not in laps.columns:
+        return _add_null_columns(laps, (("evolution_corrected_s", pl.Float64),))
+
+    slope = estimate_evolution(laps, time_column=time_column)
+    if slope == 0.0:
+        return laps.with_columns(evolution_corrected_s=pl.col(time_column))
+
+    # Subtract the improvement the track has already handed over by this lap.
+    return laps.with_columns(
+        evolution_corrected_s=pl.col(time_column) - slope * (pl.col("lap_number") - 1)
     )

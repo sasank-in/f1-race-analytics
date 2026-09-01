@@ -7,12 +7,16 @@ what it leaves behind. Two residual signatures tell you whether a correction is 
 number. A residual negative correlation means the correction is too weak — fuel burn is
 still showing through. A positive one means it is too strong.
 
-**Degradation sign.** A correction that over-shoots pushes fitted stint slopes negative,
-which reads as tyres getting faster with age. That is physically impossible, so any
-negative slope is direct evidence the coefficient at that circuit is too large.
+**Degradation sign.** A fitted stint slope below zero reads as tyres getting faster
+with age, which is impossible. It is direct evidence that something the corrections do
+not model is still improving lap times through a stint.
 
-The second is the sharper test, because it fails loudly rather than degrading quietly,
-and it is what surfaced the problem at Jeddah, Melbourne and Baku.
+The second is the sharper test, because it fails loudly rather than degrading quietly.
+It surfaced negative slopes at Jeddah, Melbourne and Baku — and the cause turned out
+not to be the fuel coefficient. Sweeping that coefficient at Jeddah made the slopes
+*more* negative, not less: at 0.030 s/kg the median stint fit is -0.018, and at 0.010
+it is -0.058. The residual is track evolution, which a session-wide linear fit only
+partly removes because grip improves fastest early and then flattens.
 """
 
 from __future__ import annotations

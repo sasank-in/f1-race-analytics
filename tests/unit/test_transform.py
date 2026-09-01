@@ -279,3 +279,44 @@ def test_empty_frame_stays_empty_through_every_transform() -> None:
     assert corrections.add_traffic_state(empty).is_empty()
     assert stints.derive_stints(empty).is_empty()
     assert stints.derive_pit_stops(empty).is_empty()
+
+
+def test_evolution_correction_removes_a_session_wide_grip_trend() -> None:
+    """Track evolution is a field-wide effect, not a property of one driver's tyres."""
+    rows = []
+    for driver in range(6):
+        for lap in range(1, 31):
+            rows.append(
+                {
+                    "session_id": 1,
+                    "driver_number": str(driver),
+                    "lap_number": lap,
+                    "lap_time_s": 95.0,
+                    # Every car improves by the same amount as the track rubbers in.
+                    "fuel_corrected_s": 95.0 - 0.02 * (lap - 1) + driver * 0.1,
+                    "is_representative": True,
+                }
+            )
+    out = corrections.add_evolution_correction(pl.DataFrame(rows))
+    corrected = out.get_column("evolution_corrected_s").to_numpy()
+    lap_numbers = out.get_column("lap_number").to_numpy()
+    trend = float(pl.DataFrame({"a": lap_numbers, "b": corrected}).select(
+        pl.corr("a", "b")
+    ).item())
+    assert abs(trend) < 0.2, "the grip trend should be gone after correcting"
+
+
+def test_evolution_correction_ignores_a_worsening_track() -> None:
+    """A field getting slower is degradation, not evolution, and belongs to the tyre."""
+    rows = [
+        {
+            "session_id": 1,
+            "driver_number": "1",
+            "lap_number": lap,
+            "lap_time_s": 95.0,
+            "fuel_corrected_s": 95.0 + 0.05 * lap,
+            "is_representative": True,
+        }
+        for lap in range(1, 61)
+    ]
+    assert corrections.estimate_evolution(pl.DataFrame(rows)) == 0.0

@@ -6,10 +6,29 @@ are perfectly collinear (measured correlation exactly -1.0). A regression on tha
 returns roughly 1.0 s/kg — thirty times the physical value — because the fuel term
 absorbs every effect that trends through a race.
 
-Pooling the same circuit across seasons breaks the collinearity. A circuit run over 57
-laps one year and 53 the next has *different fuel loads at the same lap number*, and
-different lap numbers at the same fuel load. That decoupling is what makes the mass
-term identifiable.
+**This approach was tried against 2022 and 2023 and it does not work.** The result is
+kept here because the negative finding is worth more than another attempt at the same
+idea.
+
+The hypothesis was that pooling a circuit across seasons breaks the collinearity: a
+race run over 57 laps one year and 53 the next should give different fuel loads at the
+same lap number. It does not, and the reason is in the formula. ``fuel_load_kg`` is
+computed as ``100 - (lap - 1) * 100 / total_laps``, so changing ``total_laps`` only
+rescales the slope. Fuel stays an exact linear function of lap number inside *every*
+race, and pooling two perfectly collinear sets yields another one.
+
+Measured across both seasons: Monza, with the largest usable spread at 51 versus 53
+laps, still shows a fuel/lap-number correlation of **-0.9993**. Suzuka, whose 25-lap
+spread comes from a rain-shortened race, shows **-1.0000** exactly. Every fit lands
+outside physical bounds and is refused.
+
+F1 race distance is fixed by regulation at roughly 305 km, so lap counts barely vary
+between seasons at the same circuit. Of 20 circuits appearing in both 2022 and 2023,
+17 ran *identical* lap counts. There is no cross-season variation to exploit.
+
+What would actually work is fuel load that varies independently of race progress:
+practice long-runs, where teams deliberately test different loads at the same tyre age.
+That needs practice-session ingestion, which the pipeline does not yet do.
 
 Two things still have to be absorbed or the fuel term will soak them up instead:
 

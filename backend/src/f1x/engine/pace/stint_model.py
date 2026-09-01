@@ -107,13 +107,22 @@ def fit_stint(
     )
 
 
-def fit_session(laps: pl.DataFrame, *, time_column: str = "fuel_corrected_s") -> list[StintFit]:
+def fit_session(
+    laps: pl.DataFrame, *, time_column: str = "evolution_corrected_s"
+) -> list[StintFit]:
     """Fit every stint in a session.
 
     Uses fuel-corrected times by default. Falling back to raw lap times would make a
     heavy-fuel stint appear to *gain* pace, inverting the sign of degradation, so the
     caller must supply a corrected column for a race.
     """
+    # Fall back to fuel-corrected times when evolution has not been computed, and to
+    # raw times only as a last resort — a heavy-fuel stint fitted on raw times shows
+    # negative degradation, inverting the sign of the whole model.
+    for candidate in (time_column, "fuel_corrected_s", "lap_time_s"):
+        if candidate in laps.columns:
+            time_column = candidate
+            break
     required = {"session_id", "driver_number", "stint", "tyre_life", time_column}
     if laps.is_empty() or not required <= set(laps.columns):
         return []
