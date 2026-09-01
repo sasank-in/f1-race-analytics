@@ -882,5 +882,80 @@ def analyse_quality(
         )
 
 
+ratings_app = typer.Typer(help="Composite driver ratings.", no_args_is_help=True)
+app.add_typer(ratings_app, name="ratings")
+
+
+@ratings_app.command("drivers")
+def ratings_drivers(
+    season: int = typer.Argument(..., help="Season to rate"),
+) -> None:
+    """Rate drivers on pace, racecraft, consistency and tyre management.
+
+    Scores are relative to the drivers being compared, so they say who was better
+    within a season and nothing about absolute standard across seasons.
+    """
+    import polars as pl
+    from sqlalchemy import create_engine, text
+
+    from f1x.engine.metrics.ratings import build_ratings
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+
+    def frame(sql: str) -> pl.DataFrame:
+        with engine.connect() as conn:
+            rows = [dict(r) for r in conn.execute(text(sql), {"season": season}).mappings()]
+        return pl.DataFrame(rows) if rows else pl.DataFrame()
+
+    pace = frame(
+        "SELECT p.* FROM mart.pace_rankings p "
+        "JOIN core.sessions s ON s.id = p.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "WHERE e.season_year = :season"
+    )
+    results = frame(
+        "SELECT en.driver_number, r.grid_position, r.position "
+        "FROM core.results r "
+        "JOIN core.sessions s ON s.id = r.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "JOIN core.entries en "
+        "  ON en.session_id = r.session_id AND en.driver_id = r.driver_id "
+        "WHERE e.season_year = :season"
+    )
+    stints = frame(
+        "SELECT f.* FROM mart.stint_fits f "
+        "JOIN core.sessions s ON s.id = f.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "WHERE e.season_year = :season"
+    )
+
+    ratings = build_ratings(pace, results, stints)
+    if not ratings:
+        console.print(
+            f"[yellow]No ratings for {season}.[/] Run `f1x analyse all` first."
+        )
+        raise typer.Exit(1)
+
+    table = Table(
+        "#", "driver", "overall", "pace", "racecraft", "consistency", "tyres",
+        "strongest", title=f"{season} driver ratings",
+    )
+    for rating in ratings[:15]:
+        table.add_row(
+            str(rating.rank),
+            rating.driver_number,
+            f"{rating.overall:.1f}",
+            f"{rating.pace:.0f}",
+            f"{rating.racecraft:.0f}",
+            f"{rating.consistency:.0f}",
+            f"{rating.tyre_management:.0f}",
+            rating.strongest,
+        )
+    console.print(table)
+    console.print(
+        "[dim]Scores are relative to this season's field, not an absolute scale.[/]"
+    )
+
+
 if __name__ == "__main__":
     app()
