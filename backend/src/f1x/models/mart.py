@@ -19,6 +19,7 @@ from sqlalchemy import (
     Double,
     ForeignKey,
     Index,
+    Integer,
     SmallInteger,
     String,
     UniqueConstraint,
@@ -82,6 +83,101 @@ class LapMetric(Base):
     stint: Mapped[int | None] = mapped_column(SmallInteger)
     compound: Mapped[str | None] = mapped_column(String(16))
     tyre_life: Mapped[float | None] = mapped_column(Double)
+
+    engine_version: Mapped[str] = mapped_column(String(16))
+    computed_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class StintFitRow(Base):
+    """One fitted stint: pace and degradation separated by regression."""
+
+    __tablename__ = "stint_fits"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "driver_number", "stint", "engine_version",
+            name="uq_stint_fits_key",
+        ),
+        Index("ix_stint_fits_session", "session_id", "engine_version"),
+        {"schema": "mart", "comment": "Per-stint pace/degradation split; recomputable"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("core.sessions.id", ondelete="CASCADE"))
+    driver_number: Mapped[str] = mapped_column(String(3))
+    stint: Mapped[int] = mapped_column(SmallInteger)
+    compound: Mapped[str | None] = mapped_column(String(16))
+    n_laps: Mapped[int | None] = mapped_column(SmallInteger)
+
+    # Lap time at zero tyre age: the stint's pace with degradation removed.
+    pace_s: Mapped[float | None] = mapped_column(Double)
+    degradation_s_per_lap: Mapped[float | None] = mapped_column(Double)
+    r_squared: Mapped[float | None] = mapped_column(Double)
+    residual_std_s: Mapped[float | None] = mapped_column(Double)
+    tyre_age_start: Mapped[float | None] = mapped_column(Double)
+    # False when the fit is too short, too noisy, or physically implausible.
+    is_reliable: Mapped[bool | None] = mapped_column(Boolean)
+
+    engine_version: Mapped[str] = mapped_column(String(16))
+    computed_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class PaceRanking(Base):
+    """Driver pace in one session, ranked on a quantile of clean corrected laps."""
+
+    __tablename__ = "pace_rankings"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "driver_number", "engine_version", name="uq_pace_rankings_key"
+        ),
+        Index("ix_pace_rankings_session", "session_id", "engine_version"),
+        {"schema": "mart", "comment": "Per-driver session pace; recomputable"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("core.sessions.id", ondelete="CASCADE"))
+    driver_number: Mapped[str] = mapped_column(String(3))
+
+    n_laps: Mapped[int | None] = mapped_column(SmallInteger)
+    pace_s: Mapped[float | None] = mapped_column(Double)
+    best_s: Mapped[float | None] = mapped_column(Double)
+    median_s: Mapped[float | None] = mapped_column(Double)
+    std_s: Mapped[float | None] = mapped_column(Double)
+    clean_air_laps: Mapped[int | None] = mapped_column(SmallInteger)
+    gap_to_best_s: Mapped[float | None] = mapped_column(Double)
+    rank: Mapped[int | None] = mapped_column(SmallInteger)
+
+    engine_version: Mapped[str] = mapped_column(String(16))
+    computed_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class DegradationCurveRow(Base):
+    """Pooled degradation for one compound at one circuit."""
+
+    __tablename__ = "degradation_curves"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "compound", "engine_version", name="uq_degradation_curves_key"
+        ),
+        {"schema": "mart", "comment": "Per-compound degradation; recomputable"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("core.sessions.id", ondelete="CASCADE"))
+    compound: Mapped[str] = mapped_column(String(16))
+
+    n_stints: Mapped[int | None] = mapped_column(SmallInteger)
+    n_laps: Mapped[int | None] = mapped_column(Integer)
+    degradation_s_per_lap: Mapped[float | None] = mapped_column(Double)
+    # Spread across stints — the honest width of the estimate, not just its centre.
+    degradation_iqr_s: Mapped[float | None] = mapped_column(Double)
+    median_pace_s: Mapped[float | None] = mapped_column(Double)
+    max_stint_laps: Mapped[int | None] = mapped_column(SmallInteger)
 
     engine_version: Mapped[str] = mapped_column(String(16))
     computed_at: Mapped[dt.datetime] = mapped_column(

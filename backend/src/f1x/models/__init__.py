@@ -14,7 +14,12 @@ from f1x.models.core import (
     Stint,
     Team,
 )
-from f1x.models.mart import LapMetric
+from f1x.models.mart import (
+    DegradationCurveRow,
+    LapMetric,
+    PaceRanking,
+    StintFitRow,
+)
 from f1x.models.raw import ingest_runs
 from f1x.models.timeseries import Position, RaceControl, Telemetry, Weather
 
@@ -32,11 +37,13 @@ __all__ = [
     "HYPERTABLES",
     "Base",
     "Circuit",
+    "DegradationCurveRow",
     "Driver",
     "Entry",
     "Event",
     "Lap",
     "LapMetric",
+    "PaceRanking",
     "PitStop",
     "Position",
     "RaceControl",
@@ -44,6 +51,7 @@ __all__ = [
     "Season",
     "Session",
     "Stint",
+    "StintFitRow",
     "Team",
     "Telemetry",
     "Weather",

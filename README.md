@@ -188,8 +188,56 @@ Two checks worth knowing, because they validate the model rather than the plumbi
 - Mean stint length orders **SOFT 11.3 < MEDIUM 17.1 < HARD 25.4** laps. Nothing in the
   code enforces that ordering; it falls out of the derivation, which is the useful signal.
 
-The two races that over-correct do so because the fuel coefficient is currently a uniform
-0.030 s/kg. Fitting it per circuit is Phase 4 work.
+The two races that over-correct do so because the fuel coefficient is a uniform
+0.030 s/kg. See **Fitting the fuel effect** below for why fitting it per circuit turns
+out not to be possible from single-season data.
+
+### Analysis
+
+```bash
+.venv/Scripts/python.exe -m f1x.cli analyse session 66     # one session
+.venv/Scripts/python.exe -m f1x.cli analyse all --season 2023
+```
+
+Fits every stint, ranks driver pace, and pools degradation by compound. Output lands in
+`mart.stint_fits`, `mart.pace_rankings` and `mart.degradation_curves`, each stamped with
+`engine_version`.
+
+**Stint regression** is the core idea. A stint's lap times mix two effects: the car's
+underlying pace, and grip lost as the tyres age. Fitting a line through the stint splits
+them — the intercept is pace on a fresh set, the slope is the cost of each lap of tyre
+age. "Who was quickest?" and "whose tyres lasted?" then have separate answers, which a
+stint average cannot give.
+
+**Pace ranking** uses the 20th percentile of clean fuel-corrected laps, not the fastest
+lap and not the mean. The fastest lap rewards whoever got the best single opportunity;
+the mean rewards whoever avoided traffic. A low quantile describes what the car could do
+when pushed, without one exceptional lap defining the rating.
+
+Over 2023 the engine ranks Verstappen fastest in **14 of 22 races**, Pérez in 3, Norris
+in 2 — reconstructed from lap times alone, with no access to finishing order.
+
+**Degradation** pools reliable stint fits by compound, reporting the median slope and its
+interquartile spread. Median because one damaged car should not define a compound; spread
+because a strategy model given only a centre will present a pit window as a single lap.
+
+### Fitting the fuel effect
+
+The plan was to replace the assumed 0.030 s/kg with a coefficient fitted per circuit.
+That turns out to be impossible from one season, and the reason is worth recording.
+
+`fuel_load_kg` is derived from lap number by a linear burn assumption, so within a race
+it is perfectly collinear with lap number — measured correlation exactly **-1.0**. A
+regression on it cannot isolate mass; it absorbs everything that trends through a race,
+including track evolution and rubber build-in, and returns roughly **1.0 s/kg**, about
+thirty times the physical value.
+
+This is an identification problem, not a numerical one. `engine/pace/fuel_model.py`
+therefore fits the coefficient, rejects it against physical bounds, and falls back to the
+default — a rule of thumb applied honestly beats a fitted number that is confidently
+wrong on every lap. Isolating mass needs fuel variation independent of race progress:
+the same circuit across seasons with different race lengths, or practice runs where teams
+deliberately vary load. Both are future work.
 
 ## Development
 
@@ -236,8 +284,8 @@ modes are inferred, never measured.
 | 1 | Schema, migrations, hypertables, continuous aggregates | done |
 | 2 | Ingestion: FastF1 client, session loader, backfill, QA gates | done |
 | 3 | Transform: validity, stints, pit stops, clean air | done |
-| 4 | Engine: pace and degradation | next |
-| 5 | Engine: strategy and pit loss | |
+| 4 | Engine: pace and degradation | done |
+| 5 | Engine: strategy and pit loss | next |
 | 6 | Engine: telemetry and corners | |
 | 7 | Engine: simulation | |
 | 8 | Engine: predictive models and composite ratings | |

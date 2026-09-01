@@ -331,5 +331,106 @@ def transform_all(
     console.print(f"[green]{len(ids)} sessions, {total:,} representative laps.[/]")
 
 
+analyse_app = typer.Typer(
+    help="Run the pace and degradation engine.", no_args_is_help=True
+)
+app.add_typer(analyse_app, name="analyse")
+
+
+@analyse_app.command("session")
+def analyse_session_cmd(
+    session_id: int = typer.Argument(..., help="core.sessions.id to analyse"),
+) -> None:
+    """Fit stints, rank pace and build degradation curves for one session."""
+    from sqlalchemy import create_engine
+
+    from f1x.engine.repository import analyse_and_store
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    result = analyse_and_store(engine, session_id)
+
+    if not result.stint_fits and not result.ranking:
+        console.print(
+            f"[yellow]No lap metrics for session {session_id}.[/] "
+            "Run `f1x transform session` first."
+        )
+        raise typer.Exit(1)
+
+    pace = Table("#", "driver", "pace", "gap", "laps", "std", title="pace ranking")
+    for entry in result.ranking[:10]:
+        pace.add_row(
+            str(entry.rank),
+            entry.driver_number,
+            f"{entry.pace_s:.3f}s",
+            f"+{entry.gap_to_best_s:.3f}" if entry.rank > 1 else "-",
+            str(entry.n_laps),
+            f"{entry.std_s:.3f}",
+        )
+    console.print(pace)
+
+    if result.curves:
+        deg = Table("compound", "deg/lap", "spread", "stints", "longest", title="degradation")
+        for curve in sorted(result.curves, key=lambda c: -c.degradation_s_per_lap):
+            deg.add_row(
+                curve.compound,
+                f"{curve.degradation_s_per_lap:+.3f}s",
+                f"{curve.degradation_iqr_s:.3f}",
+                str(curve.n_stints),
+                f"{curve.max_stint_laps} laps",
+            )
+        console.print(deg)
+
+    console.print(
+        f"[green]{result.reliable_fits} of {len(result.stint_fits)} stint fits reliable.[/]"
+    )
+
+
+@analyse_app.command("all")
+def analyse_all(
+    season: int | None = typer.Option(None, help="Restrict to one season"),
+) -> None:
+    """Analyse every transformed session, or every session in one season."""
+    from sqlalchemy import create_engine, text
+
+    from f1x.engine.repository import analyse_and_store
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    all_sessions = text(
+        "SELECT DISTINCT m.session_id FROM mart.lap_metrics m "
+        "JOIN core.sessions s ON s.id = m.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "ORDER BY 1"
+    )
+    one_season = text(
+        "SELECT DISTINCT m.session_id FROM mart.lap_metrics m "
+        "JOIN core.sessions s ON s.id = m.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "WHERE e.season_year = :season ORDER BY 1"
+    )
+    with engine.connect() as conn:
+        rows = (
+            conn.execute(one_season, {"season": season})
+            if season
+            else conn.execute(all_sessions)
+        )
+        ids = [r[0] for r in rows]
+
+    if not ids:
+        console.print("[yellow]No transformed sessions to analyse.[/]")
+        raise typer.Exit(1)
+
+    table = Table("session", "stints", "reliable", "drivers", title="analysis")
+    for session_id in ids:
+        result = analyse_and_store(engine, session_id)
+        table.add_row(
+            str(session_id),
+            str(len(result.stint_fits)),
+            str(result.reliable_fits),
+            str(len(result.ranking)),
+        )
+    console.print(table)
+    console.print(f"[green]{len(ids)} sessions analysed.[/]")
+
+
 if __name__ == "__main__":
     app()
