@@ -58,10 +58,16 @@ def degradation_cost(stint_laps: int, slope_s_per_lap: float) -> float:
     Lap n of a stint carries n laps of wear, so the total is the slope times the sum
     of 1..n — quadratic in stint length. That quadratic growth is precisely why
     splitting a long stint pays, and why the pit loss has to be weighed against it.
+
+    A negative slope is clamped to zero. Tyres do not get faster with age; a negative
+    fitted slope means the fuel correction over-corrected, which happens at low
+    degradation circuits where the uniform 0.030 s/kg coefficient is too strong.
+    Left unclamped it would make long stints look *beneficial* and drive the
+    optimiser toward a one-stop for the wrong reason.
     """
     if stint_laps <= 0:
         return 0.0
-    return slope_s_per_lap * stint_laps * (stint_laps - 1) / 2.0
+    return max(0.0, slope_s_per_lap) * stint_laps * (stint_laps - 1) / 2.0
 
 
 def split_evenly(total_laps: int, n_stints: int) -> tuple[int, ...]:

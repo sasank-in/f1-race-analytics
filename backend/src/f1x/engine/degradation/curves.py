@@ -43,14 +43,26 @@ class DegradationCurve:
     # prediction of where the cliff is.
     max_stint_laps: int
 
+    @property
+    def is_physical(self) -> bool:
+        """Whether the fitted slope describes tyre wear at all.
+
+        A negative slope means the fuel correction removed more than the real fuel
+        effect — common at low-degradation circuits, where the uniform coefficient
+        over-corrects. The curve is still reported, so the over-correction is visible
+        rather than hidden, but strategy must not treat it as a real gain.
+        """
+        return self.degradation_s_per_lap >= 0.0
+
     def loss_after(self, laps: float) -> float:
         """Predicted cumulative time lost after this many laps of tyre age.
 
         Linear, so it does not model the cliff — a compound that falls away sharply
         past its usable life will be under-predicted. Treat results beyond
-        ``max_stint_laps`` as extrapolation.
+        ``max_stint_laps`` as extrapolation. Clamped at zero for the same reason as
+        ``degradation_cost``: a tyre never gains time by ageing.
         """
-        return self.degradation_s_per_lap * laps
+        return max(0.0, self.degradation_s_per_lap) * laps
 
     @property
     def is_extrapolating_beyond(self) -> int:

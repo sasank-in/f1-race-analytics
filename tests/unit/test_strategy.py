@@ -220,3 +220,22 @@ def test_scan_of_empty_session_is_empty() -> None:
     assert undercut.scan_session(
         pl.DataFrame(), session_id=1, degradation_s_per_lap=0.1, net_pit_loss_s=22.0
     ) == []
+
+
+def test_negative_degradation_is_never_a_benefit() -> None:
+    """Tyres do not get faster with age.
+
+    A negative fitted slope means the fuel correction over-corrected, which happens
+    at low-degradation circuits. Left unclamped it would make long stints look
+    beneficial and drive the optimiser to a one-stop for entirely the wrong reason.
+    """
+    assert optimiser.degradation_cost(30, -0.02) == 0.0
+
+
+def test_no_degradation_means_the_minimum_legal_stops() -> None:
+    """With nothing to gain from fresh tyres, only the mandatory stop is worth making."""
+    options = optimiser.optimise(
+        total_laps=50, slope_s_per_lap=-0.02, net_pit_loss_s=22.0
+    )
+    assert options[0].n_stops == 1
+    assert options[0].degradation_cost_s == 0.0

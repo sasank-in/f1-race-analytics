@@ -242,7 +242,14 @@ against the rules.
 
 At Bahrain it ranks **2 stops (19-19-19) at 131 s** ahead of 3 stops at 135 s — the
 strategy teams actually ran, with the runner-up close enough to show the call was
-marginal rather than obvious.
+marginal rather than obvious. At Jeddah and Baku it returns **1 stop**, also matching.
+
+Degradation is clamped at zero before costing. At low-degradation circuits the uniform
+fuel coefficient over-corrects hard enough to fit a *negative* slope — tyres apparently
+getting faster with age. Left unclamped that makes long stints look beneficial and
+drives the optimiser to a one-stop for entirely the wrong reason. The curve is still
+reported with `is_physical = False`, so the over-correction stays visible rather than
+being silently absorbed.
 
 **Undercut windows** scan every lap for a driver within three seconds of the car ahead
 and ask whether fresh tyres would gain more than the gap before the rival responds.

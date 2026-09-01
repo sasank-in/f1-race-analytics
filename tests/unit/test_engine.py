@@ -259,3 +259,16 @@ def test_implausible_fuel_effect_is_rejected_not_applied() -> None:
     assert fit.effect == fuel_model.DEFAULT_FUEL_EFFECT_S_PER_KG
     if not fit.fitted:
         assert fit.reason
+
+
+def test_negative_slope_is_flagged_as_unphysical() -> None:
+    """A curve fitted to over-corrected data is reported, but marked as not physical."""
+    curves = build_curves(_fits_frame([-0.02, -0.015, -0.01]))
+    assert len(curves) == 1
+    assert curves[0].is_physical is False
+
+
+def test_predicted_loss_never_goes_negative() -> None:
+    """Ageing a tyre cannot hand time back, whatever the fit says."""
+    curve = build_curves(_fits_frame([-0.02, -0.015, -0.01]))[0]
+    assert curve.loss_after(20) == 0.0
