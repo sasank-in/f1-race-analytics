@@ -176,6 +176,21 @@ Output lands in `mart.lap_metrics`, stamped with `engine_version`, alongside der
 `core.stints` and `core.pit_stops`. Every excluded lap records *why* it was excluded, so
 a surprising pace number can always be traced back to its sample.
 
+Across the full 2023 season — 22 races, 24,420 laps — 80% of laps survive filtering.
+The remainder are attributed: 11% flagged inaccurate by the source, 3% run under yellow,
+2.6% outliers, 1.8% untimed, 1.6% deleted by the stewards.
+
+Two checks worth knowing, because they validate the model rather than the plumbing:
+
+- Lap time against lap number correlates **-0.615** on average before fuel correction and
+  **0.196** in absolute terms after, with 15 of 22 races landing inside ±0.2. The
+  correction removes the burn-off trend it is meant to remove.
+- Mean stint length orders **SOFT 11.3 < MEDIUM 17.1 < HARD 25.4** laps. Nothing in the
+  code enforces that ordering; it falls out of the derivation, which is the useful signal.
+
+The two races that over-correct do so because the fuel coefficient is currently a uniform
+0.030 s/kg. Fitting it per circuit is Phase 4 work.
+
 ## Development
 
 ```bash
