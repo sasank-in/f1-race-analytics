@@ -320,6 +320,38 @@ than a flaw: a driver winning 84% of races does not lose a 12-race points lead. 
 `is_mathematically_decided` reports whether the lead is genuinely uncatchable, which is a
 different claim from "the model never saw them lose".
 
+### Prediction and ratings
+
+```bash
+.venv/Scripts/python.exe -m f1x.cli ratings drivers 2023
+```
+
+**The feature store** obeys one rule: every feature must have been knowable *before*
+the race it predicts. All aggregates are shifted one race back, and a driver's first
+races are dropped rather than filled with a season average — filling would leak the
+future into the past. `leakage_check` flags any feature correlating above 0.98 with the
+target; it fired twice during development, both times on degenerate test data.
+
+**The outcome model** is reported against the baseline it has to beat: predicting that
+everyone finishes where they started. Grid position alone explains most of the variance
+in a modern race, so a model that cannot beat it has learned nothing.
+
+That check needed strengthening. On pure noise the ridge fit scored a **16.5 % lower
+MAE** than grid position — predicting the middle of the field beats predicting the
+extremes when outcomes are uniform — while its rank correlation was **−0.12**, ordering
+the field backwards. Mean error alone cannot reject a useless model, so the comparison
+now requires better rank correlation too.
+
+**Driver ratings** score pace, racecraft, consistency and tyre management, each
+normalised across the field being compared. Tyre management is measured within compound
+and session, since an absolute slope mixes circuits that are not comparable, and a
+driver with no valid stint fit is scored at the midpoint rather than the bottom —
+missing data is missing, not bad.
+
+On 2023: **Verstappen 81.0** led by pace 100, **Pérez 80.8** by racecraft 100,
+**Hamilton 62.6** by consistency 93 — the right top three, each with a distinct profile
+rather than one metric driving everything.
+
 ### Prior art
 
 Two findings from the literature bear directly on this engine, and one of them
@@ -435,7 +467,7 @@ modes are inferred, never measured.
 | 5 | Engine: strategy and pit loss | done |
 | 6 | Engine: telemetry and corners | done |
 | 7 | Engine: simulation | done |
-| 8 | Engine: predictive models and composite ratings | next |
-| 9 | FastAPI service, caching, typed client | |
+| 8 | Engine: predictive models and composite ratings | done |
+| 9 | FastAPI service, caching, typed client | next |
 | 10 | Next.js UI | |
 | 11 | Orchestration, incremental refresh, deploy | |
