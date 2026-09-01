@@ -80,7 +80,8 @@ def test_a_partial_correction_is_reported_as_improved() -> None:
 
 
 def test_too_few_laps_gives_no_assessment() -> None:
-    assert assess_correction(_laps(raw_slope=-0.05, corrected_slope=0.0, n=10), session_id=1) is None
+    thin = _laps(raw_slope=-0.05, corrected_slope=0.0, n=10)
+    assert assess_correction(thin, session_id=1) is None
 
 
 def test_empty_frame_gives_no_assessment() -> None:
