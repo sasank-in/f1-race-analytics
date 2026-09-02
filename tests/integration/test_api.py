@@ -24,6 +24,20 @@ def client() -> TestClient:
 
 
 @pytest.fixture(scope="module")
+def ingested_seasons(client: TestClient) -> list[int]:
+    """Seasons present in the database.
+
+    CI applies migrations to an empty database and never ingests -- ingestion needs
+    network access to FastF1 -- so a test that requires data skips there rather than
+    failing. The schema and contract tests still run.
+    """
+    seasons = client.get("/api/v1/seasons").json()
+    if not seasons:
+        pytest.skip("no seasons ingested; run `f1x ingest backfill` first")
+    return [s["year"] for s in seasons]
+
+
+@pytest.fixture(scope="module")
 def analysed_session(db_engine) -> int:
     """A session that has been through transform and analyse."""
     with db_engine.connect() as conn:
@@ -50,16 +64,21 @@ def test_health_reports_the_engine_version(client: TestClient) -> None:
     assert body["database"] == "ok"
 
 
-def test_seasons_are_listed_newest_first(client: TestClient) -> None:
-    seasons = client.get("/api/v1/seasons").json()
-    assert seasons
-    years = [s["year"] for s in seasons]
-    assert years == sorted(years, reverse=True)
+def test_seasons_endpoint_responds_on_an_empty_database(client: TestClient) -> None:
+    """The contract holds with no data: an empty list, not an error."""
+    response = client.get("/api/v1/seasons")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
 
 
-def test_events_can_be_filtered_by_season(client: TestClient) -> None:
-    seasons = client.get("/api/v1/seasons").json()
-    year = seasons[0]["year"]
+def test_seasons_are_listed_newest_first(ingested_seasons: list[int]) -> None:
+    assert ingested_seasons == sorted(ingested_seasons, reverse=True)
+
+
+def test_events_can_be_filtered_by_season(
+    client: TestClient, ingested_seasons: list[int]
+) -> None:
+    year = ingested_seasons[0]
     events = client.get(f"/api/v1/events?season={year}").json()
     assert events
     assert {e["season_year"] for e in events} == {year}
@@ -188,9 +207,10 @@ def test_simulation_rejects_an_absurd_iteration_count(client: TestClient) -> Non
     assert client.get("/api/v1/simulate/1?iterations=5").status_code == 422
 
 
-def test_ratings_carry_the_relative_scale_caveat(client: TestClient) -> None:
-    seasons = client.get("/api/v1/seasons").json()
-    response = client.get(f"/api/v1/ratings/{seasons[0]['year']}")
+def test_ratings_carry_the_relative_scale_caveat(
+    client: TestClient, ingested_seasons: list[int]
+) -> None:
+    response = client.get(f"/api/v1/ratings/{ingested_seasons[0]}")
     if response.status_code == 404:
         pytest.skip("season not analysed")
     body = response.json()
