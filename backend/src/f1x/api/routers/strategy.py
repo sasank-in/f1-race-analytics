@@ -1,0 +1,270 @@
+"""Strategy, simulation and ratings endpoints.
+
+These compute on request rather than reading a mart, because they take parameters a
+caller chooses — iteration counts, driver pairs — so precomputing every combination
+is not possible. The Redis cache keyed on those parameters is what keeps them cheap
+on repeat.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import polars as pl
+from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import text
+
+from f1x.api.deps import ResponseCache, get_cache, get_engine
+from f1x.api.schemas import (
+    DriverRatingOut,
+    Meta,
+    PitLossOut,
+    RatingsResponse,
+    SimulatedStrategyOut,
+    SimulationResponse,
+    StrategyOptionOut,
+    StrategyResponse,
+)
+from f1x.config import ENGINE_VERSION
+
+router = APIRouter(tags=["strategy"])
+
+
+def _frame(sql: str, params: dict[str, Any]) -> pl.DataFrame:
+    with get_engine().connect() as conn:
+        rows = [dict(r) for r in conn.execute(text(sql), params).mappings()]
+    return pl.DataFrame(rows) if rows else pl.DataFrame()
+
+
+def _session_inputs(session_id: int) -> tuple[pl.DataFrame, pl.DataFrame, int, float, float]:
+    """Everything strategy and simulation need, or a 404 explaining what is missing."""
+    laps = _frame(
+        "SELECT * FROM mart.lap_metrics WHERE session_id = :s AND engine_version = :v",
+        {"s": session_id, "v": ENGINE_VERSION},
+    )
+    if laps.is_empty():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"no lap metrics for session {session_id}. "
+                "Run `f1x transform` and `f1x analyse` first."
+            ),
+        )
+
+    stops = _frame(
+        "SELECT * FROM core.pit_stops WHERE session_id = :s", {"s": session_id}
+    )
+    with get_engine().connect() as conn:
+        total_laps = conn.execute(
+            text("SELECT total_laps FROM core.sessions WHERE id = :s"), {"s": session_id}
+        ).scalar_one_or_none()
+        degradation = conn.execute(
+            text(
+                "SELECT degradation_s_per_lap FROM mart.degradation_curves "
+                "WHERE session_id = :s AND engine_version = :v "
+                "ORDER BY n_stints DESC LIMIT 1"
+            ),
+            {"s": session_id, "v": ENGINE_VERSION},
+        ).scalar_one_or_none()
+        base_lap = conn.execute(
+            text(
+                "SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY lap_time_s) "
+                "FROM mart.lap_metrics "
+                "WHERE session_id = :s AND engine_version = :v AND is_representative"
+            ),
+            {"s": session_id, "v": ENGINE_VERSION},
+        ).scalar_one_or_none()
+
+    if not total_laps or degradation is None or base_lap is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"session {session_id} lacks a degradation model or race distance",
+        )
+    return laps, stops, int(total_laps), float(degradation), float(base_lap)
+
+
+@router.get("/strategy/{session_id}", response_model=StrategyResponse)
+def get_strategy(session_id: int) -> StrategyResponse:
+    """Pit loss and ranked stop strategies.
+
+    Pit loss is measured from the laps either side of a stop, not from pit-lane
+    transit time: the cost of stopping is how much the in-lap and out-lap together
+    exceed two normal laps.
+    """
+    cache = get_cache()
+    key = ResponseCache.key("strategy", {"session_id": session_id})
+    if (hit := cache.get(key)) is not None:
+        return StrategyResponse(**hit)
+
+    from f1x.engine.strategy.optimiser import MAX_STOPS, optimise
+    from f1x.engine.strategy.pit_loss import estimate_from_laps
+
+    laps, stops, total_laps, degradation, _ = _session_inputs(session_id)
+    loss = estimate_from_laps(stops, laps, session_id=session_id)
+    if loss is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"session {session_id} has too few clean pit stops to estimate loss",
+        )
+
+    ranked = optimise(
+        total_laps=total_laps,
+        slope_s_per_lap=degradation,
+        net_pit_loss_s=loss.net_loss_s,
+        max_stops=MAX_STOPS,
+    )
+    response = StrategyResponse(
+        session_id=session_id,
+        meta=Meta(engine_version=ENGINE_VERSION),
+        pit_loss=PitLossOut(
+            n_stops=loss.n_stops,
+            pit_window_s=loss.pit_window_s,
+            reference_lap_s=loss.on_track_equivalent_s,
+            net_loss_s=loss.net_loss_s,
+            spread_s=loss.spread_s,
+        ),
+        options=[
+            StrategyOptionOut(
+                n_stops=o.n_stops,
+                stint_lengths=list(o.stint_lengths),
+                degradation_cost_s=o.degradation_cost_s,
+                pit_cost_s=o.pit_cost_s,
+                total_cost_s=o.total_cost_s,
+            )
+            for o in ranked
+        ],
+    )
+    cache.set(key, response.model_dump())
+    return response
+
+
+@router.get("/simulate/{session_id}", response_model=SimulationResponse)
+def simulate_race(
+    session_id: int,
+    iterations: int = Query(default=2000, ge=100, le=20000),
+) -> SimulationResponse:
+    """Compare strategies by simulating the race many times.
+
+    A single "four seconds faster" is misleading; what matters is how often a strategy
+    wins once safety cars and lap-time noise are resampled. All strategies share one
+    seed so they face the same sampled races.
+    """
+    cache = get_cache()
+    key = ResponseCache.key(
+        "simulate", {"session_id": session_id, "iterations": iterations}
+    )
+    if (hit := cache.get(key)) is not None:
+        return SimulationResponse(**hit)
+
+    from f1x.engine.simulation.race import RaceConditions, compare_strategies
+    from f1x.engine.strategy.optimiser import MAX_STOPS, split_evenly
+    from f1x.engine.strategy.pit_loss import estimate_from_laps
+
+    laps, stops, total_laps, degradation, base_lap = _session_inputs(session_id)
+    loss = estimate_from_laps(stops, laps, session_id=session_id)
+    if loss is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"session {session_id} has too few clean pit stops to simulate",
+        )
+
+    conditions = RaceConditions(
+        total_laps=total_laps,
+        base_lap_s=base_lap,
+        net_pit_loss_s=loss.net_loss_s,
+        degradation_s_per_lap=degradation,
+    )
+    comparison = compare_strategies(
+        conditions,
+        [split_evenly(total_laps, n + 1) for n in range(1, MAX_STOPS)],
+        iterations=iterations,
+        seed=42,
+    )
+    response = SimulationResponse(
+        session_id=session_id,
+        meta=Meta(engine_version=ENGINE_VERSION),
+        iterations=iterations,
+        safety_car_rate=comparison.results[0].safety_car_rate if comparison.results else 0.0,
+        is_decisive=comparison.is_decisive,
+        strategies=[
+            SimulatedStrategyOut(
+                n_stops=r.n_stops,
+                stint_lengths=list(r.stint_lengths),
+                median_s=r.median_s,
+                p5_s=r.p5_s,
+                p95_s=r.p95_s,
+                spread_s=r.spread_s,
+                win_rate=comparison.win_rates[r.n_stops],
+            )
+            for r in sorted(comparison.results, key=lambda x: x.median_s)
+        ],
+    )
+    cache.set(key, response.model_dump())
+    return response
+
+
+@router.get("/ratings/{season}", response_model=RatingsResponse)
+def get_ratings(season: int) -> RatingsResponse:
+    """Composite driver ratings for one season.
+
+    Scores are min-max normalised across the field being compared, so they rank
+    drivers within a season and carry no meaning across seasons.
+    """
+    cache = get_cache()
+    key = ResponseCache.key("ratings", {"season": season})
+    if (hit := cache.get(key)) is not None:
+        return RatingsResponse(**hit)
+
+    from f1x.engine.metrics.ratings import build_ratings
+
+    pace = _frame(
+        "SELECT p.* FROM mart.pace_rankings p "
+        "JOIN core.sessions s ON s.id = p.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "WHERE e.season_year = :season AND p.engine_version = :v",
+        {"season": season, "v": ENGINE_VERSION},
+    )
+    if pace.is_empty():
+        raise HTTPException(
+            status_code=404,
+            detail=f"no pace rankings for {season}. Run `f1x analyse all` first.",
+        )
+
+    results = _frame(
+        "SELECT en.driver_number, r.grid_position, r.position FROM core.results r "
+        "JOIN core.sessions s ON s.id = r.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "JOIN core.entries en "
+        "  ON en.session_id = r.session_id AND en.driver_id = r.driver_id "
+        "WHERE e.season_year = :season",
+        {"season": season},
+    )
+    stints = _frame(
+        "SELECT f.* FROM mart.stint_fits f "
+        "JOIN core.sessions s ON s.id = f.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "WHERE e.season_year = :season AND f.engine_version = :v",
+        {"season": season, "v": ENGINE_VERSION},
+    )
+
+    ratings = build_ratings(pace, results, stints)
+    response = RatingsResponse(
+        season=season,
+        meta=Meta(engine_version=ENGINE_VERSION),
+        drivers=[
+            DriverRatingOut(
+                driver_number=r.driver_number,
+                rank=r.rank,
+                n_races=r.n_races,
+                overall=r.overall,
+                pace=r.pace,
+                racecraft=r.racecraft,
+                consistency=r.consistency,
+                tyre_management=r.tyre_management,
+                strongest=r.strongest,
+            )
+            for r in ratings
+        ],
+    )
+    cache.set(key, response.model_dump())
+    return response

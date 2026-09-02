@@ -1,0 +1,1590 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "F1 Race Analysis Engine",
+    "description": "\nAdvanced Formula 1 analytics.\n\nEvery analysis response carries the `engine_version` that produced it. Cached results\nare keyed on that version, so changing a model invalidates its cached values rather\nthan mixing two definitions in one chart.\n\n**On estimates.** Degradation slopes, fuel-corrected lap times and pit loss are modelled\nfrom observed timing, not measured from team telemetry. Fields that carry an estimate\nsay so in their description. In particular the fuel coefficient is a published\n0.030 s/kg prior, not a value fitted from this dataset \u2014 it cannot be fitted from race\ndata, because fuel load is derived from lap number and carries no independent information.\n",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/seasons": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "List Seasons",
+        "description": "Every ingested season.",
+        "operationId": "list_seasons_api_v1_seasons_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SeasonOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Seasons Api V1 Seasons Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "List Events",
+        "description": "Grand prix weekends, newest first.",
+        "operationId": "list_events_api_v1_events_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to one season",
+              "title": "Season"
+            },
+            "description": "Restrict to one season"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventOut"
+                  },
+                  "title": "Response List Events Api V1 Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "List Sessions",
+        "description": "Timed sessions. Every analysis endpoint is keyed by one of these ids.",
+        "operationId": "list_sessions_api_v1_sessions_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "FP1-3, Q, SQ, S or R",
+              "title": "Kind"
+            },
+            "description": "FP1-3, Q, SQ, S or R"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionOut"
+                  },
+                  "title": "Response List Sessions Api V1 Sessions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "Get Session",
+        "description": "One session.",
+        "operationId": "get_session_api_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/laps/{session_id}": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Get Laps",
+        "description": "Per-lap metrics, including why any lap was excluded.",
+        "operationId": "get_laps_api_v1_analysis_laps__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "driver",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to one car number",
+              "title": "Driver"
+            },
+            "description": "Restrict to one car number"
+          },
+          {
+            "name": "representative_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only laps that belong in a pace sample",
+              "default": false,
+              "title": "Representative Only"
+            },
+            "description": "Only laps that belong in a pace sample"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LapOut"
+                  },
+                  "title": "Response Get Laps Api V1 Analysis Laps  Session Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/pace/{session_id}": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Get Pace",
+        "description": "Driver pace, ranked.\n\nPace is the 20th percentile of clean fuel-corrected laps \u2014 not the fastest lap,\nwhich rewards whoever had the best single opportunity, and not the mean, which\nrewards whoever avoided traffic.",
+        "operationId": "get_pace_api_v1_analysis_pace__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/degradation/{session_id}": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Get Degradation",
+        "description": "Tyre degradation by compound, with the stint fits behind it.\n\nA stint fit may report a negative slope when the run was too short to support an\nestimate. Those are returned with ``is_physical`` false rather than hidden \u2014 the\nfailure is information about the stint.",
+        "operationId": "get_degradation_api_v1_analysis_degradation__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DegradationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/strategy/{session_id}": {
+      "get": {
+        "tags": [
+          "strategy"
+        ],
+        "summary": "Get Strategy",
+        "description": "Pit loss and ranked stop strategies.\n\nPit loss is measured from the laps either side of a stop, not from pit-lane\ntransit time: the cost of stopping is how much the in-lap and out-lap together\nexceed two normal laps.",
+        "operationId": "get_strategy_api_v1_strategy__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/simulate/{session_id}": {
+      "get": {
+        "tags": [
+          "strategy"
+        ],
+        "summary": "Simulate Race",
+        "description": "Compare strategies by simulating the race many times.\n\nA single \"four seconds faster\" is misleading; what matters is how often a strategy\nwins once safety cars and lap-time noise are resampled. All strategies share one\nseed so they face the same sampled races.",
+        "operationId": "simulate_race_api_v1_simulate__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "iterations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20000,
+              "minimum": 100,
+              "default": 2000,
+              "title": "Iterations"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ratings/{season}": {
+      "get": {
+        "tags": [
+          "strategy"
+        ],
+        "summary": "Get Ratings",
+        "description": "Composite driver ratings for one season.\n\nScores are min-max normalised across the field being compared, so they rank\ndrivers within a season and carry no meaning across seasons.",
+        "operationId": "get_ratings_api_v1_ratings__season__get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Season"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/telemetry/compare/{session_id}": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Compare Laps",
+        "description": "Compare two laps: cumulative delta time and corner-by-corner minimum speeds.\n\nThe delta trace answers *where* a lap was won, not just by how much. A step down\nunder braking is a later brake point; a rise on the straight after a corner means\nthe time was actually won in the corner before it.",
+        "operationId": "compare_laps_api_v1_telemetry_compare__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "driver_a",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Driver A"
+            }
+          },
+          {
+            "name": "lap_a",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lap A"
+            }
+          },
+          {
+            "name": "driver_b",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Driver B"
+            }
+          },
+          {
+            "name": "lap_b",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lap B"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryCompareResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Health",
+        "description": "Liveness and dependency check, for a load balancer or `f1x doctor`.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CornerDeltaOut": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "apex_distance_m": {
+            "type": "number",
+            "title": "Apex Distance M"
+          },
+          "reference_min_speed_kmh": {
+            "type": "number",
+            "title": "Reference Min Speed Kmh"
+          },
+          "comparison_min_speed_kmh": {
+            "type": "number",
+            "title": "Comparison Min Speed Kmh"
+          },
+          "delta_kmh": {
+            "type": "number",
+            "title": "Delta Kmh"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "apex_distance_m",
+          "reference_min_speed_kmh",
+          "comparison_min_speed_kmh",
+          "delta_kmh"
+        ],
+        "title": "CornerDeltaOut"
+      },
+      "DegradationOut": {
+        "properties": {
+          "compound": {
+            "type": "string",
+            "title": "Compound"
+          },
+          "n_stints": {
+            "type": "integer",
+            "title": "N Stints"
+          },
+          "n_laps": {
+            "type": "integer",
+            "title": "N Laps"
+          },
+          "degradation_s_per_lap": {
+            "type": "number",
+            "title": "Degradation S Per Lap",
+            "description": "Median slope across reliable stints on this compound"
+          },
+          "degradation_iqr_s": {
+            "type": "number",
+            "title": "Degradation Iqr S",
+            "description": "Interquartile spread: the honest width of the estimate"
+          },
+          "median_pace_s": {
+            "type": "number",
+            "title": "Median Pace S"
+          },
+          "max_stint_laps": {
+            "type": "integer",
+            "title": "Max Stint Laps",
+            "description": "Longest observed stint. Predictions beyond this extrapolate."
+          }
+        },
+        "type": "object",
+        "required": [
+          "compound",
+          "n_stints",
+          "n_laps",
+          "degradation_s_per_lap",
+          "degradation_iqr_s",
+          "median_pace_s",
+          "max_stint_laps"
+        ],
+        "title": "DegradationOut"
+      },
+      "DegradationResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "compounds": {
+            "items": {
+              "$ref": "#/components/schemas/DegradationOut"
+            },
+            "type": "array",
+            "title": "Compounds"
+          },
+          "stints": {
+            "items": {
+              "$ref": "#/components/schemas/StintFitOut"
+            },
+            "type": "array",
+            "title": "Stints"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "meta",
+          "compounds",
+          "stints"
+        ],
+        "title": "DegradationResponse"
+      },
+      "DriverRatingOut": {
+        "properties": {
+          "driver_number": {
+            "type": "string",
+            "title": "Driver Number"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "n_races": {
+            "type": "integer",
+            "title": "N Races"
+          },
+          "overall": {
+            "type": "number",
+            "title": "Overall"
+          },
+          "pace": {
+            "type": "number",
+            "title": "Pace"
+          },
+          "racecraft": {
+            "type": "number",
+            "title": "Racecraft"
+          },
+          "consistency": {
+            "type": "number",
+            "title": "Consistency"
+          },
+          "tyre_management": {
+            "type": "number",
+            "title": "Tyre Management"
+          },
+          "strongest": {
+            "type": "string",
+            "title": "Strongest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "driver_number",
+          "rank",
+          "n_races",
+          "overall",
+          "pace",
+          "racecraft",
+          "consistency",
+          "tyre_management",
+          "strongest"
+        ],
+        "title": "DriverRatingOut"
+      },
+      "EventOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "season_year": {
+            "type": "integer",
+            "title": "Season Year"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "circuit_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Circuit Key"
+          },
+          "event_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "season_year",
+          "round",
+          "name"
+        ],
+        "title": "EventOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LapOut": {
+        "properties": {
+          "driver_number": {
+            "type": "string",
+            "title": "Driver Number"
+          },
+          "lap_number": {
+            "type": "integer",
+            "title": "Lap Number"
+          },
+          "lap_time_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lap Time S"
+          },
+          "compound": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compound"
+          },
+          "tyre_life": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tyre Life"
+          },
+          "stint": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stint"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "is_representative": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Representative",
+            "description": "Whether this lap belongs in a pace sample"
+          },
+          "exclusion_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclusion Reason",
+            "description": "Why the lap was excluded, when it was"
+          },
+          "fuel_corrected_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fuel Corrected S",
+            "description": "Lap time corrected to an empty-tank equivalent using a published 0.030 s/kg coefficient. An estimate, not measured fuel telemetry."
+          }
+        },
+        "type": "object",
+        "required": [
+          "driver_number",
+          "lap_number"
+        ],
+        "title": "LapOut"
+      },
+      "Meta": {
+        "properties": {
+          "engine_version": {
+            "type": "string",
+            "title": "Engine Version",
+            "description": "Engine version that produced these values"
+          },
+          "computed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Computed At",
+            "description": "When the underlying metrics were computed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "engine_version"
+        ],
+        "title": "Meta",
+        "description": "Provenance attached to every analysis response."
+      },
+      "PaceOut": {
+        "properties": {
+          "driver_number": {
+            "type": "string",
+            "title": "Driver Number"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "n_laps": {
+            "type": "integer",
+            "title": "N Laps"
+          },
+          "pace_s": {
+            "type": "number",
+            "title": "Pace S",
+            "description": "20th percentile of clean fuel-corrected laps, not the fastest lap"
+          },
+          "gap_to_best_s": {
+            "type": "number",
+            "title": "Gap To Best S"
+          },
+          "best_s": {
+            "type": "number",
+            "title": "Best S"
+          },
+          "median_s": {
+            "type": "number",
+            "title": "Median S"
+          },
+          "std_s": {
+            "type": "number",
+            "title": "Std S",
+            "description": "Lap-time spread: lower is more consistent"
+          },
+          "clean_air_laps": {
+            "type": "integer",
+            "title": "Clean Air Laps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "driver_number",
+          "rank",
+          "n_laps",
+          "pace_s",
+          "gap_to_best_s",
+          "best_s",
+          "median_s",
+          "std_s",
+          "clean_air_laps"
+        ],
+        "title": "PaceOut"
+      },
+      "PaceResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "drivers": {
+            "items": {
+              "$ref": "#/components/schemas/PaceOut"
+            },
+            "type": "array",
+            "title": "Drivers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "meta",
+          "drivers"
+        ],
+        "title": "PaceResponse"
+      },
+      "PitLossOut": {
+        "properties": {
+          "n_stops": {
+            "type": "integer",
+            "title": "N Stops"
+          },
+          "pit_window_s": {
+            "type": "number",
+            "title": "Pit Window S",
+            "description": "Pit entry to pit exit: transit only"
+          },
+          "reference_lap_s": {
+            "type": "number",
+            "title": "Reference Lap S"
+          },
+          "net_loss_s": {
+            "type": "number",
+            "title": "Net Loss S",
+            "description": "What a stop actually costs: how much the in-lap and out-lap together exceed two normal laps"
+          },
+          "spread_s": {
+            "type": "number",
+            "title": "Spread S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n_stops",
+          "pit_window_s",
+          "reference_lap_s",
+          "net_loss_s",
+          "spread_s"
+        ],
+        "title": "PitLossOut"
+      },
+      "RatingsResponse": {
+        "properties": {
+          "season": {
+            "type": "integer",
+            "title": "Season"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "Ratings are min-max normalised, so cross-season comparison is meaningless",
+            "default": "Scores are relative to this season's field, not an absolute scale."
+          },
+          "drivers": {
+            "items": {
+              "$ref": "#/components/schemas/DriverRatingOut"
+            },
+            "type": "array",
+            "title": "Drivers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "season",
+          "meta",
+          "drivers"
+        ],
+        "title": "RatingsResponse"
+      },
+      "SeasonOut": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "n_events": {
+            "type": "integer",
+            "title": "N Events"
+          },
+          "has_telemetry": {
+            "type": "boolean",
+            "title": "Has Telemetry",
+            "description": "Whether car telemetry exists for this season (2018 onward)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "n_events",
+          "has_telemetry"
+        ],
+        "title": "SeasonOut"
+      },
+      "SessionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "event_id": {
+            "type": "integer",
+            "title": "Event Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "FP1-3, Q, SQ, S or R"
+          },
+          "event_name": {
+            "type": "string",
+            "title": "Event Name"
+          },
+          "season_year": {
+            "type": "integer",
+            "title": "Season Year"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "total_laps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Laps"
+          },
+          "telemetry_loaded": {
+            "type": "boolean",
+            "title": "Telemetry Loaded"
+          },
+          "start_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "event_id",
+          "kind",
+          "event_name",
+          "season_year",
+          "round",
+          "telemetry_loaded"
+        ],
+        "title": "SessionOut"
+      },
+      "SimulatedStrategyOut": {
+        "properties": {
+          "n_stops": {
+            "type": "integer",
+            "title": "N Stops"
+          },
+          "stint_lengths": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Stint Lengths"
+          },
+          "median_s": {
+            "type": "number",
+            "title": "Median S"
+          },
+          "p5_s": {
+            "type": "number",
+            "title": "P5 S"
+          },
+          "p95_s": {
+            "type": "number",
+            "title": "P95 S"
+          },
+          "spread_s": {
+            "type": "number",
+            "title": "Spread S",
+            "description": "Width of the middle 90 % of outcomes"
+          },
+          "win_rate": {
+            "type": "number",
+            "title": "Win Rate",
+            "description": "Share of simulated races this strategy won"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n_stops",
+          "stint_lengths",
+          "median_s",
+          "p5_s",
+          "p95_s",
+          "spread_s",
+          "win_rate"
+        ],
+        "title": "SimulatedStrategyOut"
+      },
+      "SimulationResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "iterations": {
+            "type": "integer",
+            "title": "Iterations"
+          },
+          "safety_car_rate": {
+            "type": "number",
+            "title": "Safety Car Rate"
+          },
+          "is_decisive": {
+            "type": "boolean",
+            "title": "Is Decisive",
+            "description": "False when the leading strategy wins too rarely to call it"
+          },
+          "strategies": {
+            "items": {
+              "$ref": "#/components/schemas/SimulatedStrategyOut"
+            },
+            "type": "array",
+            "title": "Strategies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "meta",
+          "iterations",
+          "safety_car_rate",
+          "is_decisive",
+          "strategies"
+        ],
+        "title": "SimulationResponse"
+      },
+      "StintFitOut": {
+        "properties": {
+          "driver_number": {
+            "type": "string",
+            "title": "Driver Number"
+          },
+          "stint": {
+            "type": "integer",
+            "title": "Stint"
+          },
+          "compound": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compound"
+          },
+          "n_laps": {
+            "type": "integer",
+            "title": "N Laps"
+          },
+          "pace_s": {
+            "type": "number",
+            "title": "Pace S",
+            "description": "Fitted lap time at zero tyre age"
+          },
+          "degradation_s_per_lap": {
+            "type": "number",
+            "title": "Degradation S Per Lap",
+            "description": "Fitted slope. May be negative when the stint was too short to support an estimate; see is_physical."
+          },
+          "is_physical": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Physical",
+            "description": "False when the fitted slope is negative. Tyres do not gain time with age, so such a fit means the stint gave too little usable range."
+          },
+          "is_reliable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Reliable"
+          },
+          "r_squared": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R Squared"
+          },
+          "tyre_age_range": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tyre Age Range",
+            "description": "Span of tyre age the fit actually covered"
+          },
+          "excluded_lap_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Lap Count",
+            "description": "Laps the warm-up cutoff removed before fitting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "driver_number",
+          "stint",
+          "n_laps",
+          "pace_s",
+          "degradation_s_per_lap"
+        ],
+        "title": "StintFitOut"
+      },
+      "StrategyOptionOut": {
+        "properties": {
+          "n_stops": {
+            "type": "integer",
+            "title": "N Stops"
+          },
+          "stint_lengths": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Stint Lengths"
+          },
+          "degradation_cost_s": {
+            "type": "number",
+            "title": "Degradation Cost S"
+          },
+          "pit_cost_s": {
+            "type": "number",
+            "title": "Pit Cost S"
+          },
+          "total_cost_s": {
+            "type": "number",
+            "title": "Total Cost S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n_stops",
+          "stint_lengths",
+          "degradation_cost_s",
+          "pit_cost_s",
+          "total_cost_s"
+        ],
+        "title": "StrategyOptionOut"
+      },
+      "StrategyResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "pit_loss": {
+            "$ref": "#/components/schemas/PitLossOut"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyOptionOut"
+            },
+            "type": "array",
+            "title": "Options",
+            "description": "Ranked cheapest first. A dry race mandates at least one stop."
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "meta",
+          "pit_loss",
+          "options"
+        ],
+        "title": "StrategyResponse"
+      },
+      "TelemetryCompareResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "reference_driver": {
+            "type": "string",
+            "title": "Reference Driver"
+          },
+          "comparison_driver": {
+            "type": "string",
+            "title": "Comparison Driver"
+          },
+          "final_delta_s": {
+            "type": "number",
+            "title": "Final Delta S",
+            "description": "Lap-time difference. Negative means the comparison lap was quicker."
+          },
+          "distance_m": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Distance M",
+            "description": "Common distance grid, one metre apart"
+          },
+          "delta_s": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Delta S",
+            "description": "Cumulative time difference at each point on the lap"
+          },
+          "corners": {
+            "items": {
+              "$ref": "#/components/schemas/CornerDeltaOut"
+            },
+            "type": "array",
+            "title": "Corners"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "meta",
+          "reference_driver",
+          "comparison_driver",
+          "final_delta_s",
+          "distance_m",
+          "delta_s",
+          "corners"
+        ],
+        "title": "TelemetryCompareResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

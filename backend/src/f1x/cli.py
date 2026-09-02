@@ -969,5 +969,50 @@ def ratings_drivers(
     )
 
 
+api_app = typer.Typer(help="Run and inspect the API service.", no_args_is_help=True)
+app.add_typer(api_app, name="api")
+
+
+@api_app.command("serve")
+def api_serve(
+    host: str = typer.Option("127.0.0.1", help="Bind address"),
+    port: int = typer.Option(8000, min=1, max=65535),
+    reload: bool = typer.Option(False, "--reload", help="Reload on source changes"),
+) -> None:
+    """Start the FastAPI service."""
+    import uvicorn
+
+    console.print(f"[green]API on[/] http://{host}:{port}  [dim]docs at /docs[/]")
+    uvicorn.run("f1x.api.app:app", host=host, port=port, reload=reload)
+
+
+@api_app.command("schema")
+def api_schema(
+    output: str = typer.Option("openapi.json", help="Where to write the schema"),
+) -> None:
+    """Write the OpenAPI schema, for generating the frontend's typed client."""
+    import json
+    from pathlib import Path
+
+    from f1x.api.app import create_app
+
+    schema = create_app().openapi()
+    Path(output).write_text(json.dumps(schema, indent=2), encoding="utf-8")
+    console.print(
+        f"[green]Wrote {len(schema['paths'])} paths to {output}.[/]\n"
+        "[dim]Generate a TypeScript client with:[/] "
+        "npx openapi-typescript openapi.json -o frontend/src/api/schema.ts"
+    )
+
+
+@api_app.command("cache-clear")
+def api_cache_clear() -> None:
+    """Drop every cached response for the current engine version."""
+    from f1x.api.deps import get_cache
+
+    removed = get_cache().clear()
+    console.print(f"[green]Cleared {removed} cached responses.[/]")
+
+
 if __name__ == "__main__":
     app()

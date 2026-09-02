@@ -362,6 +362,46 @@ On 2023: **Verstappen 81.0** led by pace 100, **Pérez 80.8** by racecraft 100,
 **Hamilton 62.6** by consistency 93 — the right top three, each with a distinct profile
 rather than one metric driving everything.
 
+### API
+
+```bash
+.venv/Scripts/python.exe -m f1x.cli api serve        # http://127.0.0.1:8000/docs
+.venv/Scripts/python.exe -m f1x.cli api schema       # export OpenAPI
+.venv/Scripts/python.exe -m f1x.cli api cache-clear  # drop cached responses
+```
+
+Twelve endpoints over the marts: seasons, events and sessions for navigation; laps, pace
+and degradation for analysis; strategy, simulation, telemetry comparison and driver
+ratings for the engine's output.
+
+The API adds nothing analytical of its own. It reads marts and calls the same pure
+functions the CLI does, so a number served here is the number the CLI prints and a bug
+can only be in one place.
+
+Three things it does enforce:
+
+**Provenance travels with every response.** Each analysis result carries the
+`engine_version` that produced it, and fields holding an estimate say so in their
+OpenAPI description — `fuel_corrected_s` states that it uses a published coefficient
+rather than measured telemetry. A number that arrives without its caveats gets treated
+as fact.
+
+**Cache keys include the engine version.** Changing a model invalidates its cached
+responses rather than serving values computed under the old definition — the same
+discipline the mart tables use, applied at the edge. Redis being unreachable makes the
+API slower, never broken: every cache operation degrades to a miss.
+
+**Failures explain what to do.** A session that has not been through the engine returns
+404 with "Run `f1x transform` and `f1x analyse` first", not an empty list that looks like
+a session with no laps.
+
+The frontend's TypeScript client is generated from the schema, so a renamed field
+surfaces as a compile error rather than an undefined value at runtime:
+
+```bash
+npx openapi-typescript openapi.json -o frontend/src/api/schema.ts
+```
+
 ### Prior art
 
 Two findings from the literature bear directly on this engine, and one of them
@@ -498,6 +538,6 @@ modes are inferred, never measured.
 | 6 | Engine: telemetry and corners | done |
 | 7 | Engine: simulation | done |
 | 8 | Engine: predictive models and composite ratings | done |
-| 9 | FastAPI service, caching, typed client | next |
-| 10 | Next.js UI | |
+| 9 | FastAPI service, caching, typed client | done |
+| 10 | Next.js UI | next |
 | 11 | Orchestration, incremental refresh, deploy | |
