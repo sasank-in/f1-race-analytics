@@ -428,6 +428,26 @@ bounds is discarded, never applied.
 Fitted coefficients land on `core.circuits.fuel_effect_s_per_kg` and the transform picks
 them up automatically, falling back to the default for circuits without enough history.
 
+**A pooled regression was also tried and also fails**, and the way it fails is worth
+recording because it looks like a success. Pooling all 44 races with stint fixed effects
+and a quadratic tyre-age term yields beta_fuel = **+0.049 s/kg** over 36,642 laps at
+r-squared 0.996 — squarely in the published 0.025–0.040 band.
+
+Refitting by compound breaks it: **SOFT −0.041, MEDIUM +0.011, HARD +0.072 s/kg**. An
+eleven-hundredth swing including a physically impossible negative is not a constant being
+measured. The cause is that stint fixed effects leave only *within*-stint variation, and
+the within-stint correlation between fuel load and tyre age is **−1.0000 across 100 % of
+1,816 stints**. The two regressors are the same variable inside a stint, so the solver
+partitions their shared effect arbitrarily and the partition moves with the subset.
+
+A quadratic tyre-age term was tested separately and changes nothing — 351 negative stint
+slopes with or without it — because the warm-up cutoff in `stint_model.py` already
+removes the curvature it would model.
+
+The conclusion is not that the regression was specified wrongly. It is that race data
+contains no variation capable of identifying this coefficient, and the honest response is
+to use the published default and say so.
+
 ## Development
 
 ```bash

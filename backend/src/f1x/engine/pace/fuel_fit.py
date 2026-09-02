@@ -26,6 +26,26 @@ F1 race distance is fixed by regulation at roughly 305 km, so lap counts barely 
 between seasons at the same circuit. Of 20 circuits appearing in both 2022 and 2023,
 17 ran *identical* lap counts. There is no cross-season variation to exploit.
 
+**A pooled regression with stint fixed effects was also tried, and also fails.** Pooling
+all 44 races and adding a quadratic tyre-age term (the design in `reg.txt`) does produce
+a plausible-looking number: beta_fuel = +0.049 s/kg over 36,642 laps, r-squared 0.996,
+sitting neatly in the published 0.025-0.040 band.
+
+It does not survive a subset check. Refitting by compound gives **SOFT -0.041, MEDIUM
++0.011, HARD +0.072 s/kg** — a swing of eleven hundredths including a physically
+impossible negative. A real physical constant does not move like that.
+
+The reason is that stint fixed effects absorb all *between*-stint variation, leaving the
+regression only *within*-stint information. Measured across 1,816 stints, the within-stint
+correlation between fuel load and tyre age is **-1.0000 in 100 % of them**. Inside a stint
+the two regressors are the same variable up to a linear transform, so the solver splits
+their shared effect arbitrarily and the split moves with whatever else differs between
+subsets. The pooled estimate is not an estimate of fuel sensitivity; it is an arbitrary
+partition of the combined per-lap trend.
+
+Dropping the fixed effects does not rescue it either: without them the fuel term absorbs
+circuit and season pace differences instead, which is the failure documented above.
+
 What would actually work is fuel load that varies independently of race progress:
 practice long-runs, where teams deliberately test different loads at the same tyre age.
 That needs practice-session ingestion, which the pipeline does not yet do.
