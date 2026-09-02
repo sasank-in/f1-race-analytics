@@ -13,6 +13,7 @@ type Schemas = components["schemas"];
 export type Season = Schemas["SeasonOut"];
 export type Event = Schemas["EventOut"];
 export type Session = Schemas["SessionOut"];
+export type SessionSummary = Schemas["SessionSummaryOut"];
 export type Lap = Schemas["LapOut"];
 export type PaceResponse = Schemas["PaceResponse"];
 export type DegradationResponse = Schemas["DegradationResponse"];
@@ -31,6 +32,10 @@ export type TrackMapResponse = Schemas["TrackMapResponse"];
 export type TrackPoint = Schemas["TrackPointOut"];
 export type TeammatesResponse = Schemas["TeammatesResponse"];
 export type TeammateDelta = Schemas["TeammateDeltaOut"];
+export type SeasonProfileResponse = Schemas["SeasonProfileResponse"];
+export type CircuitProfile = Schemas["CircuitProfileOut"];
+export type SeasonPaceResponse = Schemas["SeasonPaceResponse"];
+export type SeasonPaceRow = Schemas["SeasonPaceRowOut"];
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -75,6 +80,8 @@ export const api = {
   sessions: (season?: number) =>
     get<Session[]>(season ? `/sessions?season=${season}` : "/sessions"),
   session: (id: number) => get<Session>(`/sessions/${id}`),
+  summaries: (season?: number) =>
+    get<SessionSummary[]>(season ? `/summaries?season=${season}` : "/summaries"),
 
   laps: (id: number, representativeOnly = false) =>
     get<Lap[]>(
@@ -88,6 +95,11 @@ export const api = {
     get<UndercutResponse>(`/undercut/${id}?max_gap_s=${maxGap}`),
   stints: (id: number) => get<StintTimelineResponse>(`/stints/${id}`),
   teammates: (season: number) => get<TeammatesResponse>(`/teammates/${season}`),
+  circuits: (season?: number) =>
+    get<SeasonProfileResponse>(
+      season ? `/season/circuits?season=${season}` : "/season/circuits",
+    ),
+  seasonPace: (season: number) => get<SeasonPaceResponse>(`/season/pace/${season}`),
   trackMap: (id: number, driver: string, lap: number) =>
     get<TrackMapResponse>(`/telemetry/map/${id}?driver=${driver}&lap=${lap}`),
   simulate: (id: number, iterations = 2000) =>

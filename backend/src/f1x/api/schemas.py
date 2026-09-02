@@ -96,6 +96,22 @@ class PaceOut(BaseModel):
     driver_number: str
     rank: int
     n_laps: int
+
+    # Outcome, carried alongside pace because the gap between them is the point.
+    # A car can be third-quickest and finish nowhere; without the result beside the
+    # pace, a reader takes the ranking for a finishing order.
+    finish_position: float | None = Field(
+        default=None, description="Classified finishing position, null if not classified"
+    )
+    status: str | None = Field(
+        default=None, description="Finished, Lapped, Retired, or a stated cause"
+    )
+    laps_completed: float | None = None
+    did_not_finish: bool = Field(
+        default=False,
+        description="True when the driver retired. Their pace still counts — it is "
+        "measured from the laps they did complete — but the result did not follow it.",
+    )
     pace_s: float = Field(
         description="20th percentile of clean fuel-corrected laps, not the fastest lap"
     )
@@ -410,3 +426,98 @@ class TeammatesResponse(BaseModel):
         "splits, damage and traffic are not controlled for.",
     )
     pairings: list[TeammateDeltaOut]
+
+
+# --------------------------------------------------------------------------
+# session summary
+# --------------------------------------------------------------------------
+
+
+class SessionSummaryOut(BaseModel):
+    """One race reduced to what makes it worth opening.
+
+    A list of 44 identically-shaped rows gives a reader no reason to pick one. This
+    is the line that does: who won, whether the quickest car actually won, and what
+    the strategy turned on.
+    """
+
+    session_id: int
+    event_name: str
+    season_year: int
+    round: int
+    total_laps: int | None = None
+    telemetry_loaded: bool
+
+    winner: str | None = None
+    fastest_driver: str | None = Field(
+        default=None, description="Quickest on corrected pace, which is often not the winner"
+    )
+    pace_winner_mismatch: bool = Field(
+        default=False,
+        description="True when the quickest car did not win — the races worth a look",
+    )
+    n_retirements: int = 0
+    optimal_stops: int | None = None
+    headline: str | None = Field(
+        default=None, description="One sentence describing the race"
+    )
+
+
+# --------------------------------------------------------------------------
+# season views
+# --------------------------------------------------------------------------
+
+
+class CircuitProfileOut(BaseModel):
+    """One circuit's tyre and strategy character, pooled across every race there."""
+
+    circuit_key: str
+    circuit_name: str | None = None
+    n_races: int
+    seasons: list[int]
+
+    degradation_s_per_lap: float = Field(
+        description="Median across compounds and races at this circuit"
+    )
+    typical_stint_laps: float = Field(
+        description="Longest stint observed, averaged — how long a set lasts here"
+    )
+    net_pit_loss_s: float | None = Field(
+        default=None, description="What a stop costs at this circuit"
+    )
+    typical_stops: float | None = None
+    reference_lap_s: float | None = None
+
+
+class SeasonProfileResponse(BaseModel):
+    meta: Meta
+    season: int | None = Field(
+        default=None, description="Null when pooled across every ingested season"
+    )
+    note: str = Field(
+        default="Degradation is fitted from lap times, not measured. Circuits are "
+        "ranked on the median across the races held there.",
+    )
+    circuits: list[CircuitProfileOut]
+
+
+class SeasonPaceRowOut(BaseModel):
+    """One driver's pace across a season, race by race."""
+
+    driver_number: str
+    n_races: int
+    mean_gap_s: float = Field(description="Mean gap to the quickest car, per race")
+    best_gap_s: float
+    worst_gap_s: float
+    wins_on_pace: int = Field(
+        description="Races where this driver had the quickest corrected pace"
+    )
+    # Gap per round, so a form curve can be drawn. Null where the driver did not run.
+    gaps: list[float | None]
+
+
+class SeasonPaceResponse(BaseModel):
+    season: int
+    meta: Meta
+    rounds: list[int]
+    drivers: list[SeasonPaceRowOut]

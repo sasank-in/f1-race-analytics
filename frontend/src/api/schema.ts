@@ -84,6 +84,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/summaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Summaries
+         * @description Each race in one line, so a list of 44 becomes navigable.
+         *
+         *     The mismatch flag is the useful part: a race where the quickest car did not win
+         *     is where the interesting analysis lives.
+         */
+        get: operations["list_summaries_api_v1_summaries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analysis/laps/{session_id}": {
         parameters: {
             query?: never;
@@ -341,6 +364,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/season/circuits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Circuit Profiles
+         * @description Which circuits punish tyres, ranked.
+         *
+         *     A strategist's first question about an unfamiliar track, and one that only has an
+         *     answer across a calendar: a single race tells you what happened there, not how the
+         *     circuit compares.
+         */
+        get: operations["circuit_profiles_api_v1_season_circuits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/season/pace/{season}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Season Pace
+         * @description Every driver's pace gap, race by race.
+         *
+         *     The shape of a season: who improved, who fell away, and where a car's upgrade
+         *     actually landed. A per-race ranking cannot show any of that.
+         */
+        get: operations["season_pace_api_v1_season_pace__season__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -365,6 +435,39 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * CircuitProfileOut
+         * @description One circuit's tyre and strategy character, pooled across every race there.
+         */
+        CircuitProfileOut: {
+            /** Circuit Key */
+            circuit_key: string;
+            /** Circuit Name */
+            circuit_name?: string | null;
+            /** N Races */
+            n_races: number;
+            /** Seasons */
+            seasons: number[];
+            /**
+             * Degradation S Per Lap
+             * @description Median across compounds and races at this circuit
+             */
+            degradation_s_per_lap: number;
+            /**
+             * Typical Stint Laps
+             * @description Longest stint observed, averaged — how long a set lasts here
+             */
+            typical_stint_laps: number;
+            /**
+             * Net Pit Loss S
+             * @description What a stop costs at this circuit
+             */
+            net_pit_loss_s?: number | null;
+            /** Typical Stops */
+            typical_stops?: number | null;
+            /** Reference Lap S */
+            reference_lap_s?: number | null;
+        };
         /** CornerDeltaOut */
         CornerDeltaOut: {
             /** Index */
@@ -531,6 +634,24 @@ export interface components {
             /** N Laps */
             n_laps: number;
             /**
+             * Finish Position
+             * @description Classified finishing position, null if not classified
+             */
+            finish_position?: number | null;
+            /**
+             * Status
+             * @description Finished, Lapped, Retired, or a stated cause
+             */
+            status?: string | null;
+            /** Laps Completed */
+            laps_completed?: number | null;
+            /**
+             * Did Not Finish
+             * @description True when the driver retired. Their pace still counts — it is measured from the laps they did complete — but the result did not follow it.
+             * @default false
+             */
+            did_not_finish: boolean;
+            /**
              * Pace S
              * @description 20th percentile of clean fuel-corrected laps, not the fastest lap
              */
@@ -602,6 +723,58 @@ export interface components {
              */
             has_telemetry: boolean;
         };
+        /** SeasonPaceResponse */
+        SeasonPaceResponse: {
+            /** Season */
+            season: number;
+            meta: components["schemas"]["Meta"];
+            /** Rounds */
+            rounds: number[];
+            /** Drivers */
+            drivers: components["schemas"]["SeasonPaceRowOut"][];
+        };
+        /**
+         * SeasonPaceRowOut
+         * @description One driver's pace across a season, race by race.
+         */
+        SeasonPaceRowOut: {
+            /** Driver Number */
+            driver_number: string;
+            /** N Races */
+            n_races: number;
+            /**
+             * Mean Gap S
+             * @description Mean gap to the quickest car, per race
+             */
+            mean_gap_s: number;
+            /** Best Gap S */
+            best_gap_s: number;
+            /** Worst Gap S */
+            worst_gap_s: number;
+            /**
+             * Wins On Pace
+             * @description Races where this driver had the quickest corrected pace
+             */
+            wins_on_pace: number;
+            /** Gaps */
+            gaps: (number | null)[];
+        };
+        /** SeasonProfileResponse */
+        SeasonProfileResponse: {
+            meta: components["schemas"]["Meta"];
+            /**
+             * Season
+             * @description Null when pooled across every ingested season
+             */
+            season?: number | null;
+            /**
+             * Note
+             * @default Degradation is fitted from lap times, not measured. Circuits are ranked on the median across the races held there.
+             */
+            note: string;
+            /** Circuits */
+            circuits: components["schemas"]["CircuitProfileOut"][];
+        };
         /** SessionOut */
         SessionOut: {
             /** Id */
@@ -625,6 +798,53 @@ export interface components {
             telemetry_loaded: boolean;
             /** Start Utc */
             start_utc?: string | null;
+        };
+        /**
+         * SessionSummaryOut
+         * @description One race reduced to what makes it worth opening.
+         *
+         *     A list of 44 identically-shaped rows gives a reader no reason to pick one. This
+         *     is the line that does: who won, whether the quickest car actually won, and what
+         *     the strategy turned on.
+         */
+        SessionSummaryOut: {
+            /** Session Id */
+            session_id: number;
+            /** Event Name */
+            event_name: string;
+            /** Season Year */
+            season_year: number;
+            /** Round */
+            round: number;
+            /** Total Laps */
+            total_laps?: number | null;
+            /** Telemetry Loaded */
+            telemetry_loaded: boolean;
+            /** Winner */
+            winner?: string | null;
+            /**
+             * Fastest Driver
+             * @description Quickest on corrected pace, which is often not the winner
+             */
+            fastest_driver?: string | null;
+            /**
+             * Pace Winner Mismatch
+             * @description True when the quickest car did not win — the races worth a look
+             * @default false
+             */
+            pace_winner_mismatch: boolean;
+            /**
+             * N Retirements
+             * @default 0
+             */
+            n_retirements: number;
+            /** Optimal Stops */
+            optimal_stops?: number | null;
+            /**
+             * Headline
+             * @description One sentence describing the race
+             */
+            headline?: string | null;
         };
         /** SimulatedStrategyOut */
         SimulatedStrategyOut: {
@@ -1070,6 +1290,38 @@ export interface operations {
             };
         };
     };
+    list_summaries_api_v1_summaries_get: {
+        parameters: {
+            query?: {
+                /** @description Restrict to one season */
+                season?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_laps_api_v1_analysis_laps__session_id__get: {
         parameters: {
             query?: {
@@ -1415,6 +1667,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrackMapResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    circuit_profiles_api_v1_season_circuits_get: {
+        parameters: {
+            query?: {
+                /** @description Restrict to one season */
+                season?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    season_pace_api_v1_season_pace__season__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                season: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonPaceResponse"];
                 };
             };
             /** @description Validation Error */

@@ -203,6 +203,62 @@
         }
       }
     },
+    "/api/v1/summaries": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "List Summaries",
+        "description": "Each race in one line, so a list of 44 becomes navigable.\n\nThe mismatch flag is the useful part: a race where the quickest car did not win\nis where the interesting analysis lives.",
+        "operationId": "list_summaries_api_v1_summaries_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to one season",
+              "title": "Season"
+            },
+            "description": "Restrict to one season"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionSummaryOut"
+                  },
+                  "title": "Response List Summaries Api V1 Summaries Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analysis/laps/{session_id}": {
       "get": {
         "tags": [
@@ -788,6 +844,101 @@
         }
       }
     },
+    "/api/v1/season/circuits": {
+      "get": {
+        "tags": [
+          "season"
+        ],
+        "summary": "Circuit Profiles",
+        "description": "Which circuits punish tyres, ranked.\n\nA strategist's first question about an unfamiliar track, and one that only has an\nanswer across a calendar: a single race tells you what happened there, not how the\ncircuit compares.",
+        "operationId": "circuit_profiles_api_v1_season_circuits_get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to one season",
+              "title": "Season"
+            },
+            "description": "Restrict to one season"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/season/pace/{season}": {
+      "get": {
+        "tags": [
+          "season"
+        ],
+        "summary": "Season Pace",
+        "description": "Every driver's pace gap, race by race.\n\nThe shape of a season: who improved, who fell away, and where a car's upgrade\nactually landed. A per-race ranking cannot show any of that.",
+        "operationId": "season_pace_api_v1_season_pace__season__get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Season"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonPaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -815,6 +966,90 @@
   },
   "components": {
     "schemas": {
+      "CircuitProfileOut": {
+        "properties": {
+          "circuit_key": {
+            "type": "string",
+            "title": "Circuit Key"
+          },
+          "circuit_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Circuit Name"
+          },
+          "n_races": {
+            "type": "integer",
+            "title": "N Races"
+          },
+          "seasons": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Seasons"
+          },
+          "degradation_s_per_lap": {
+            "type": "number",
+            "title": "Degradation S Per Lap",
+            "description": "Median across compounds and races at this circuit"
+          },
+          "typical_stint_laps": {
+            "type": "number",
+            "title": "Typical Stint Laps",
+            "description": "Longest stint observed, averaged \u2014 how long a set lasts here"
+          },
+          "net_pit_loss_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Pit Loss S",
+            "description": "What a stop costs at this circuit"
+          },
+          "typical_stops": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typical Stops"
+          },
+          "reference_lap_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Lap S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "circuit_key",
+          "n_races",
+          "seasons",
+          "degradation_s_per_lap",
+          "typical_stint_laps"
+        ],
+        "title": "CircuitProfileOut",
+        "description": "One circuit's tyre and strategy character, pooled across every race there."
+      },
       "CornerDeltaOut": {
         "properties": {
           "index": {
@@ -1261,6 +1496,47 @@
             "type": "integer",
             "title": "N Laps"
           },
+          "finish_position": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Position",
+            "description": "Classified finishing position, null if not classified"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Finished, Lapped, Retired, or a stated cause"
+          },
+          "laps_completed": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laps Completed"
+          },
+          "did_not_finish": {
+            "type": "boolean",
+            "title": "Did Not Finish",
+            "description": "True when the driver retired. Their pace still counts \u2014 it is measured from the laps they did complete \u2014 but the result did not follow it.",
+            "default": false
+          },
           "pace_s": {
             "type": "number",
             "title": "Pace S",
@@ -1417,6 +1693,132 @@
         ],
         "title": "SeasonOut"
       },
+      "SeasonPaceResponse": {
+        "properties": {
+          "season": {
+            "type": "integer",
+            "title": "Season"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "rounds": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Rounds"
+          },
+          "drivers": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonPaceRowOut"
+            },
+            "type": "array",
+            "title": "Drivers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "season",
+          "meta",
+          "rounds",
+          "drivers"
+        ],
+        "title": "SeasonPaceResponse"
+      },
+      "SeasonPaceRowOut": {
+        "properties": {
+          "driver_number": {
+            "type": "string",
+            "title": "Driver Number"
+          },
+          "n_races": {
+            "type": "integer",
+            "title": "N Races"
+          },
+          "mean_gap_s": {
+            "type": "number",
+            "title": "Mean Gap S",
+            "description": "Mean gap to the quickest car, per race"
+          },
+          "best_gap_s": {
+            "type": "number",
+            "title": "Best Gap S"
+          },
+          "worst_gap_s": {
+            "type": "number",
+            "title": "Worst Gap S"
+          },
+          "wins_on_pace": {
+            "type": "integer",
+            "title": "Wins On Pace",
+            "description": "Races where this driver had the quickest corrected pace"
+          },
+          "gaps": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "driver_number",
+          "n_races",
+          "mean_gap_s",
+          "best_gap_s",
+          "worst_gap_s",
+          "wins_on_pace",
+          "gaps"
+        ],
+        "title": "SeasonPaceRowOut",
+        "description": "One driver's pace across a season, race by race."
+      },
+      "SeasonProfileResponse": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "season": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season",
+            "description": "Null when pooled across every ingested season"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": "Degradation is fitted from lap times, not measured. Circuits are ranked on the median across the races held there."
+          },
+          "circuits": {
+            "items": {
+              "$ref": "#/components/schemas/CircuitProfileOut"
+            },
+            "type": "array",
+            "title": "Circuits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meta",
+          "circuits"
+        ],
+        "title": "SeasonProfileResponse"
+      },
       "SessionOut": {
         "properties": {
           "id": {
@@ -1483,6 +1885,108 @@
           "telemetry_loaded"
         ],
         "title": "SessionOut"
+      },
+      "SessionSummaryOut": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "event_name": {
+            "type": "string",
+            "title": "Event Name"
+          },
+          "season_year": {
+            "type": "integer",
+            "title": "Season Year"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "total_laps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Laps"
+          },
+          "telemetry_loaded": {
+            "type": "boolean",
+            "title": "Telemetry Loaded"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner"
+          },
+          "fastest_driver": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastest Driver",
+            "description": "Quickest on corrected pace, which is often not the winner"
+          },
+          "pace_winner_mismatch": {
+            "type": "boolean",
+            "title": "Pace Winner Mismatch",
+            "description": "True when the quickest car did not win \u2014 the races worth a look",
+            "default": false
+          },
+          "n_retirements": {
+            "type": "integer",
+            "title": "N Retirements",
+            "default": 0
+          },
+          "optimal_stops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Optimal Stops"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline",
+            "description": "One sentence describing the race"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "event_name",
+          "season_year",
+          "round",
+          "telemetry_loaded"
+        ],
+        "title": "SessionSummaryOut",
+        "description": "One race reduced to what makes it worth opening.\n\nA list of 44 identically-shaped rows gives a reader no reason to pick one. This\nis the line that does: who won, whether the quickest car actually won, and what\nthe strategy turned on."
       },
       "SimulatedStrategyOut": {
         "properties": {

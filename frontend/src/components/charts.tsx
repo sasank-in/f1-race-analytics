@@ -48,6 +48,7 @@ export function PaceChart({ data }: { data: PaceResponse }) {
         <span className="w-16 text-right">gap</span>
         <span className="w-20 text-right">pace</span>
         <span className="w-10 text-right">laps</span>
+        <span className="w-14 text-right">result</span>
       </div>
       {drivers.map((driver) => {
         const width = (driver.gap_to_best_s / maxGap) * 100;
@@ -107,6 +108,24 @@ export function PaceChart({ data }: { data: PaceResponse }) {
               title={`${driver.n_laps} clean laps`}
             >
               {driver.n_laps}
+            </span>
+
+            {/* Outcome beside pace. A car can be third-quickest and finish nowhere;
+                without this the ranking reads as a finishing order. */}
+            <span
+              className="tnum w-14 text-right"
+              style={{
+                color: driver.did_not_finish
+                  ? "var(--critical)"
+                  : "var(--text-secondary)",
+              }}
+              title={driver.status ?? undefined}
+            >
+              {driver.did_not_finish
+                ? "DNF"
+                : driver.finish_position
+                  ? `P${driver.finish_position.toFixed(0)}`
+                  : "—"}
             </span>
           </div>
         );

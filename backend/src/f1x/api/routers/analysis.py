@@ -98,12 +98,21 @@ def get_pace(session_id: int) -> PaceResponse:
     _require_analysed(session_id, "mart.pace_rankings", "pace rankings")
 
     with get_engine().connect() as conn:
+        # Joined to results so pace and outcome arrive together. Kept as a LEFT JOIN:
+        # a session without classification still returns its pace.
         rows = conn.execute(
             text(
-                "SELECT driver_number, rank, n_laps, pace_s, gap_to_best_s, best_s, "
-                "       median_s, std_s, clean_air_laps "
-                "FROM mart.pace_rankings "
-                "WHERE session_id = :s AND engine_version = :v ORDER BY rank"
+                "SELECT p.driver_number, p.rank, p.n_laps, p.pace_s, p.gap_to_best_s, "
+                "       p.best_s, p.median_s, p.std_s, p.clean_air_laps, "
+                "       r.position AS finish_position, r.status, r.laps_completed, "
+                "       coalesce(r.status IN ('Retired', 'Withdrew', 'Disqualified'), false) "
+                "         AS did_not_finish "
+                "FROM mart.pace_rankings p "
+                "LEFT JOIN core.entries en "
+                "  ON en.session_id = p.session_id AND en.driver_number = p.driver_number "
+                "LEFT JOIN core.results r "
+                "  ON r.session_id = p.session_id AND r.driver_id = en.driver_id "
+                "WHERE p.session_id = :s AND p.engine_version = :v ORDER BY p.rank"
             ),
             {"s": session_id, "v": ENGINE_VERSION},
         ).mappings()
