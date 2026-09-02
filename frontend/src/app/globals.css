@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/**
+ * Design tokens.
+ *
+ * The categorical palette is the validated default from the data-viz reference,
+ * checked with scripts/validate_palette.js in both modes:
+ *   light  worst adjacent CVD ΔE 9.1, normal-vision ΔE 22.9  — PASS
+ *   dark   worst adjacent CVD ΔE 8.4, normal-vision ΔE 19.8  — PASS
+ *
+ * Light mode raises a contrast WARN on the aqua and yellow slots, which obliges
+ * visible labels rather than colour alone. Every chart here direct-labels its series,
+ * so identity never depends on hue.
+ *
+ * Tyre compounds are the exception and deliberately so. Soft/medium/hard are red,
+ * yellow and white-grey by F1 convention; a viewer reads those instantly and
+ * substituting a "better" palette would be actively confusing. Grey fails the chroma
+ * floor, so compounds are always labelled by name and the colour is a secondary cue.
+ */
+
+:root {
+  color-scheme: light;
+
+  --surface-0: #ffffff;
+  --surface-1: #fcfcfb;
+  --surface-2: #f4f4f2;
+  --border: #e2e2dd;
+  --border-strong: #c9c9c2;
+
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7975;
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+
+  /* Fixed by F1 convention, not chosen. */
+  --compound-soft: #e34948;
+  --compound-medium: #eda100;
+  --compound-hard: #8a8a8a;
+  --compound-intermediate: #1baf7a;
+  --compound-wet: #2a78d6;
+
+  --good: #008300;
+  --warning: #eda100;
+  --critical: #e34948;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #232322;
+    --border: #33332f;
+    --border-strong: #4a4a45;
+
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+
+    --compound-soft: #e66767;
+    --compound-medium: #c98500;
+    --compound-hard: #9a9a94;
+    --compound-intermediate: #199e70;
+    --compound-wet: #3987e5;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #232322;
+  --border: #33332f;
+  --border-strong: #4a4a45;
+
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+
+  --compound-soft: #e66767;
+  --compound-medium: #c98500;
+  --compound-hard: #9a9a94;
+  --compound-intermediate: #199e70;
+  --compound-wet: #3987e5;
+}
+
+body {
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Lap times and gaps line up column-wise only in a tabular figure face. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
