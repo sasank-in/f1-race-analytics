@@ -605,6 +605,49 @@
         }
       }
     },
+    "/api/v1/teammates/{season}": {
+      "get": {
+        "tags": [
+          "strategy"
+        ],
+        "summary": "Get Teammates",
+        "description": "Head-to-head pace between drivers who shared a car.\n\nThe closest thing the sport has to a controlled comparison: same machinery, same\nupgrades, same weekend. Strategy splits, damage and traffic are still not\ncontrolled for, so a thin pairing is flagged rather than presented as settled.",
+        "operationId": "get_teammates_api_v1_teammates__season__get",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Season"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeammatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/telemetry/compare/{session_id}": {
       "get": {
         "tags": [
@@ -684,6 +727,67 @@
         }
       }
     },
+    "/api/v1/telemetry/map/{session_id}": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Track Map",
+        "description": "The circuit drawn from one lap's positional trace, coloured by speed.\n\nNothing about the circuit is stored: the shape comes from where the car actually\nwent, so any layout the pipeline has data for can be drawn without a map to\nmaintain. Corner apexes are placed by translating the detected distance back onto\nthe geometry.",
+        "operationId": "track_map_api_v1_telemetry_map__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "driver",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Driver"
+            }
+          },
+          {
+            "name": "lap",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lap"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackMapResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -743,6 +847,61 @@
           "delta_kmh"
         ],
         "title": "CornerDeltaOut"
+      },
+      "CornerOut": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "apex_distance_m": {
+            "type": "number",
+            "title": "Apex Distance M"
+          },
+          "min_speed_kmh": {
+            "type": "number",
+            "title": "Min Speed Kmh"
+          },
+          "entry_speed_kmh": {
+            "type": "number",
+            "title": "Entry Speed Kmh"
+          },
+          "exit_speed_kmh": {
+            "type": "number",
+            "title": "Exit Speed Kmh"
+          },
+          "braking_point_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Braking Point M"
+          },
+          "throttle_point_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Throttle Point M"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "apex_distance_m",
+          "min_speed_kmh",
+          "entry_speed_kmh",
+          "exit_speed_kmh"
+        ],
+        "title": "CornerOut"
       },
       "DegradationOut": {
         "properties": {
@@ -1683,6 +1842,115 @@
         ],
         "title": "StrategyResponse"
       },
+      "TeammateDeltaOut": {
+        "properties": {
+          "team_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Key"
+          },
+          "driver_a": {
+            "type": "string",
+            "title": "Driver A"
+          },
+          "driver_b": {
+            "type": "string",
+            "title": "Driver B"
+          },
+          "n_sessions": {
+            "type": "integer",
+            "title": "N Sessions"
+          },
+          "faster_driver": {
+            "type": "string",
+            "title": "Faster Driver"
+          },
+          "margin_s": {
+            "type": "number",
+            "title": "Margin S",
+            "description": "Median pace gap between the pair, in seconds per lap"
+          },
+          "median_delta_s": {
+            "type": "number",
+            "title": "Median Delta S",
+            "description": "Signed gap: negative means driver_a was quicker"
+          },
+          "std_delta_s": {
+            "type": "number",
+            "title": "Std Delta S",
+            "description": "Spread across sessions. A small margin with a large spread is not settled."
+          },
+          "sessions_a_ahead": {
+            "type": "integer",
+            "title": "Sessions A Ahead"
+          },
+          "sessions_b_ahead": {
+            "type": "integer",
+            "title": "Sessions B Ahead"
+          },
+          "is_decisive": {
+            "type": "boolean",
+            "title": "Is Decisive",
+            "description": "True when one driver led at least 70% of shared sessions, not just on average"
+          },
+          "is_reliable": {
+            "type": "boolean",
+            "title": "Is Reliable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "driver_a",
+          "driver_b",
+          "n_sessions",
+          "faster_driver",
+          "margin_s",
+          "median_delta_s",
+          "std_delta_s",
+          "sessions_a_ahead",
+          "sessions_b_ahead",
+          "is_decisive",
+          "is_reliable"
+        ],
+        "title": "TeammateDeltaOut",
+        "description": "One pairing's head-to-head over the sessions they both completed."
+      },
+      "TeammatesResponse": {
+        "properties": {
+          "season": {
+            "type": "integer",
+            "title": "Season"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": "Same car, so the difference is mostly the driver \u2014 but strategy splits, damage and traffic are not controlled for."
+          },
+          "pairings": {
+            "items": {
+              "$ref": "#/components/schemas/TeammateDeltaOut"
+            },
+            "type": "array",
+            "title": "Pairings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "season",
+          "meta",
+          "pairings"
+        ],
+        "title": "TeammatesResponse"
+      },
       "TelemetryCompareResponse": {
         "properties": {
           "session_id": {
@@ -1741,6 +2009,107 @@
           "corners"
         ],
         "title": "TelemetryCompareResponse"
+      },
+      "TrackMapResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "driver_number": {
+            "type": "string",
+            "title": "Driver Number"
+          },
+          "lap_number": {
+            "type": "integer",
+            "title": "Lap Number"
+          },
+          "lap_time_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lap Time S"
+          },
+          "lap_distance_m": {
+            "type": "number",
+            "title": "Lap Distance M",
+            "description": "Integrated from speed, so within a percent or two of the official length"
+          },
+          "min_speed_kmh": {
+            "type": "number",
+            "title": "Min Speed Kmh"
+          },
+          "max_speed_kmh": {
+            "type": "number",
+            "title": "Max Speed Kmh"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TrackPointOut"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "corners": {
+            "items": {
+              "$ref": "#/components/schemas/CornerOut"
+            },
+            "type": "array",
+            "title": "Corners",
+            "description": "Detected corners, with the map coordinate of each apex"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "meta",
+          "driver_number",
+          "lap_number",
+          "lap_distance_m",
+          "min_speed_kmh",
+          "max_speed_kmh",
+          "points",
+          "corners"
+        ],
+        "title": "TrackMapResponse"
+      },
+      "TrackPointOut": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Track coordinate, normalised to 0-1000"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          },
+          "speed_kmh": {
+            "type": "number",
+            "title": "Speed Kmh"
+          },
+          "distance_m": {
+            "type": "number",
+            "title": "Distance M"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "speed_kmh",
+          "distance_m"
+        ],
+        "title": "TrackPointOut",
+        "description": "One sample of the racing line, with the speed carried there."
       },
       "UndercutResponse": {
         "properties": {

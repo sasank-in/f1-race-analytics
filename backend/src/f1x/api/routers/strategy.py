@@ -26,6 +26,8 @@ from f1x.api.schemas import (
     StintTimelineResponse,
     StrategyOptionOut,
     StrategyResponse,
+    TeammateDeltaOut,
+    TeammatesResponse,
     UndercutResponse,
     UndercutWindowOut,
 )
@@ -358,6 +360,69 @@ def get_ratings(season: int) -> RatingsResponse:
                 strongest=r.strongest,
             )
             for r in ratings
+        ],
+    )
+    cache.set(key, response.model_dump())
+    return response
+
+
+@router.get("/teammates/{season}", response_model=TeammatesResponse)
+def get_teammates(season: int) -> TeammatesResponse:
+    """Head-to-head pace between drivers who shared a car.
+
+    The closest thing the sport has to a controlled comparison: same machinery, same
+    upgrades, same weekend. Strategy splits, damage and traffic are still not
+    controlled for, so a thin pairing is flagged rather than presented as settled.
+    """
+    cache = get_cache()
+    key = ResponseCache.key("teammates", {"season": season})
+    if (hit := cache.get(key)) is not None:
+        return TeammatesResponse(**hit)
+
+    from f1x.engine.pace.teammate import compare_teammates
+
+    pace = _frame(
+        "SELECT p.session_id, p.driver_number, p.pace_s FROM mart.pace_rankings p "
+        "JOIN core.sessions s ON s.id = p.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "WHERE e.season_year = :season AND p.engine_version = :v",
+        {"season": season, "v": ENGINE_VERSION},
+    )
+    entries = _frame(
+        "SELECT en.session_id, en.driver_number, t.key AS team_key "
+        "FROM core.entries en "
+        "JOIN core.teams t ON t.id = en.team_id "
+        "JOIN core.sessions s ON s.id = en.session_id "
+        "JOIN core.events e ON e.id = s.event_id "
+        "WHERE e.season_year = :season",
+        {"season": season},
+    )
+    if pace.is_empty():
+        raise HTTPException(
+            status_code=404,
+            detail=f"no pace rankings for {season}. Run `f1x analyse all` first.",
+        )
+
+    pairings = compare_teammates(pace, entries)
+    response = TeammatesResponse(
+        season=season,
+        meta=Meta(engine_version=ENGINE_VERSION),
+        pairings=[
+            TeammateDeltaOut(
+                team_key=p.team_key,
+                driver_a=p.driver_a,
+                driver_b=p.driver_b,
+                n_sessions=p.n_sessions,
+                faster_driver=p.faster_driver,
+                margin_s=p.margin_s,
+                median_delta_s=p.median_delta_s,
+                std_delta_s=p.std_delta_s,
+                sessions_a_ahead=p.sessions_a_ahead,
+                sessions_b_ahead=p.sessions_b_ahead,
+                is_decisive=p.is_decisive,
+                is_reliable=p.is_reliable,
+            )
+            for p in pairings
         ],
     )
     cache.set(key, response.model_dump())

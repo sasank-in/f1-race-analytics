@@ -24,6 +24,9 @@ export default function RootLayout({
               <Link href="/" style={{ color: "var(--text-secondary)" }}>
                 Sessions
               </Link>
+              <Link href="/teammates" style={{ color: "var(--text-secondary)" }}>
+                Teammates
+              </Link>
               <Link href="/ratings" style={{ color: "var(--text-secondary)" }}>
                 Ratings
               </Link>

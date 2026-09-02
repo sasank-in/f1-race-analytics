@@ -13,8 +13,14 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 
-import { api, type PaceResponse, type TelemetryCompareResponse } from "@/api/client";
+import {
+  api,
+  type PaceResponse,
+  type TelemetryCompareResponse,
+  type TrackMapResponse,
+} from "@/api/client";
 import { DeltaTrace } from "@/components/charts";
+import { TrackMap } from "@/components/track-map";
 import { Card, Empty, ErrorNote } from "@/components/ui";
 
 export default function TelemetryPage({
@@ -30,6 +36,7 @@ export default function TelemetryPage({
   const [driverB, setDriverB] = useState("");
   const [lap, setLap] = useState(20);
   const [result, setResult] = useState<TelemetryCompareResponse | null>(null);
+  const [map, setMap] = useState<TrackMapResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -60,6 +67,13 @@ export default function TelemetryPage({
         setError(e instanceof Error ? e.message : "Comparison failed");
       })
       .finally(() => setLoading(false));
+
+    // The map is drawn for the reference lap, so it fails independently of the
+    // comparison: a missing rival lap should not lose the circuit.
+    api
+      .trackMap(sessionId, driverA, lap)
+      .then(setMap)
+      .catch(() => setMap(null));
   }, [sessionId, driverA, driverB, lap]);
 
   const drivers = pace?.drivers ?? [];
@@ -146,6 +160,16 @@ export default function TelemetryPage({
       </div>
 
       {error && <ErrorNote detail={error} />}
+
+      {map && (
+        <Card
+          title="Track map"
+          subtitle={`Car ${map.driver_number}, lap ${map.lap_number}, coloured by speed`}
+          caveat="The circuit is drawn from the positional trace, not a stored map, so any layout with data renders. Numbered markers are the detected corners."
+        >
+          <TrackMap data={map} />
+        </Card>
+      )}
 
       {result && (
         <>

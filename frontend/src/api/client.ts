@@ -27,6 +27,10 @@ export type UndercutWindow = Schemas["UndercutWindowOut"];
 export type StintTimelineResponse = Schemas["StintTimelineResponse"];
 export type Stint = Schemas["StintOut"];
 export type Corner = Schemas["CornerDeltaOut"];
+export type TrackMapResponse = Schemas["TrackMapResponse"];
+export type TrackPoint = Schemas["TrackPointOut"];
+export type TeammatesResponse = Schemas["TeammatesResponse"];
+export type TeammateDelta = Schemas["TeammateDeltaOut"];
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -83,6 +87,9 @@ export const api = {
   undercut: (id: number, maxGap = 3) =>
     get<UndercutResponse>(`/undercut/${id}?max_gap_s=${maxGap}`),
   stints: (id: number) => get<StintTimelineResponse>(`/stints/${id}`),
+  teammates: (season: number) => get<TeammatesResponse>(`/teammates/${season}`),
+  trackMap: (id: number, driver: string, lap: number) =>
+    get<TrackMapResponse>(`/telemetry/map/${id}?driver=${driver}&lap=${lap}`),
   simulate: (id: number, iterations = 2000) =>
     get<SimulationResponse>(`/simulate/${id}?iterations=${iterations}`),
   ratings: (season: number) => get<RatingsResponse>(`/ratings/${season}`),

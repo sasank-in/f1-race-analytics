@@ -332,3 +332,81 @@ class RatingsResponse(BaseModel):
         "meaningless",
     )
     drivers: list[DriverRatingOut]
+
+
+# --------------------------------------------------------------------------
+# track map
+# --------------------------------------------------------------------------
+
+
+class TrackPointOut(BaseModel):
+    """One sample of the racing line, with the speed carried there."""
+
+    x: float = Field(description="Track coordinate, normalised to 0-1000")
+    y: float
+    speed_kmh: float
+    distance_m: float
+
+
+class TrackMapResponse(BaseModel):
+    session_id: int
+    meta: Meta
+    driver_number: str
+    lap_number: int
+    lap_time_s: float | None = None
+    lap_distance_m: float = Field(
+        description="Integrated from speed, so within a percent or two of the official length"
+    )
+    min_speed_kmh: float
+    max_speed_kmh: float
+    points: list[TrackPointOut]
+    corners: list[CornerOut] = Field(
+        description="Detected corners, with the map coordinate of each apex"
+    )
+
+
+class CornerOnMapOut(CornerOut):
+    """A corner with its position on the map, so the table links to the geometry."""
+
+    x: float
+    y: float
+
+
+# --------------------------------------------------------------------------
+# teammates
+# --------------------------------------------------------------------------
+
+
+class TeammateDeltaOut(BaseModel):
+    """One pairing's head-to-head over the sessions they both completed."""
+
+    team_key: str | None = None
+    driver_a: str
+    driver_b: str
+    n_sessions: int
+    faster_driver: str
+    margin_s: float = Field(
+        description="Median pace gap between the pair, in seconds per lap"
+    )
+    median_delta_s: float = Field(
+        description="Signed gap: negative means driver_a was quicker"
+    )
+    std_delta_s: float = Field(
+        description="Spread across sessions. A small margin with a large spread is not settled."
+    )
+    sessions_a_ahead: int
+    sessions_b_ahead: int
+    is_decisive: bool = Field(
+        description="True when one driver led at least 70% of shared sessions, not just on average"
+    )
+    is_reliable: bool
+
+
+class TeammatesResponse(BaseModel):
+    season: int
+    meta: Meta
+    note: str = Field(
+        default="Same car, so the difference is mostly the driver — but strategy "
+        "splits, damage and traffic are not controlled for.",
+    )
+    pairings: list[TeammateDeltaOut]

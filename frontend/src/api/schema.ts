@@ -268,6 +268,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teammates/{season}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Teammates
+         * @description Head-to-head pace between drivers who shared a car.
+         *
+         *     The closest thing the sport has to a controlled comparison: same machinery, same
+         *     upgrades, same weekend. Strategy splits, damage and traffic are still not
+         *     controlled for, so a thin pairing is flagged rather than presented as settled.
+         */
+        get: operations["get_teammates_api_v1_teammates__season__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telemetry/compare/{session_id}": {
         parameters: {
             query?: never;
@@ -284,6 +308,31 @@ export interface paths {
          *     the time was actually won in the corner before it.
          */
         get: operations["compare_laps_api_v1_telemetry_compare__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telemetry/map/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Track Map
+         * @description The circuit drawn from one lap's positional trace, coloured by speed.
+         *
+         *     Nothing about the circuit is stored: the shape comes from where the car actually
+         *     went, so any layout the pipeline has data for can be drawn without a map to
+         *     maintain. Corner apexes are placed by translating the detected distance back onto
+         *     the geometry.
+         */
+        get: operations["track_map_api_v1_telemetry_map__session_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -328,6 +377,23 @@ export interface components {
             comparison_min_speed_kmh: number;
             /** Delta Kmh */
             delta_kmh: number;
+        };
+        /** CornerOut */
+        CornerOut: {
+            /** Index */
+            index: number;
+            /** Apex Distance M */
+            apex_distance_m: number;
+            /** Min Speed Kmh */
+            min_speed_kmh: number;
+            /** Entry Speed Kmh */
+            entry_speed_kmh: number;
+            /** Exit Speed Kmh */
+            exit_speed_kmh: number;
+            /** Braking Point M */
+            braking_point_m?: number | null;
+            /** Throttle Point M */
+            throttle_point_m?: number | null;
         };
         /** DegradationOut */
         DegradationOut: {
@@ -696,6 +762,61 @@ export interface components {
              */
             options: components["schemas"]["StrategyOptionOut"][];
         };
+        /**
+         * TeammateDeltaOut
+         * @description One pairing's head-to-head over the sessions they both completed.
+         */
+        TeammateDeltaOut: {
+            /** Team Key */
+            team_key?: string | null;
+            /** Driver A */
+            driver_a: string;
+            /** Driver B */
+            driver_b: string;
+            /** N Sessions */
+            n_sessions: number;
+            /** Faster Driver */
+            faster_driver: string;
+            /**
+             * Margin S
+             * @description Median pace gap between the pair, in seconds per lap
+             */
+            margin_s: number;
+            /**
+             * Median Delta S
+             * @description Signed gap: negative means driver_a was quicker
+             */
+            median_delta_s: number;
+            /**
+             * Std Delta S
+             * @description Spread across sessions. A small margin with a large spread is not settled.
+             */
+            std_delta_s: number;
+            /** Sessions A Ahead */
+            sessions_a_ahead: number;
+            /** Sessions B Ahead */
+            sessions_b_ahead: number;
+            /**
+             * Is Decisive
+             * @description True when one driver led at least 70% of shared sessions, not just on average
+             */
+            is_decisive: boolean;
+            /** Is Reliable */
+            is_reliable: boolean;
+        };
+        /** TeammatesResponse */
+        TeammatesResponse: {
+            /** Season */
+            season: number;
+            meta: components["schemas"]["Meta"];
+            /**
+             * Note
+             * @default Same car, so the difference is mostly the driver — but strategy splits, damage and traffic are not controlled for.
+             */
+            note: string;
+            /** Pairings */
+            pairings: components["schemas"]["TeammateDeltaOut"][];
+        };
         /** TelemetryCompareResponse */
         TelemetryCompareResponse: {
             /** Session Id */
@@ -722,6 +843,51 @@ export interface components {
             delta_s: number[];
             /** Corners */
             corners: components["schemas"]["CornerDeltaOut"][];
+        };
+        /** TrackMapResponse */
+        TrackMapResponse: {
+            /** Session Id */
+            session_id: number;
+            meta: components["schemas"]["Meta"];
+            /** Driver Number */
+            driver_number: string;
+            /** Lap Number */
+            lap_number: number;
+            /** Lap Time S */
+            lap_time_s?: number | null;
+            /**
+             * Lap Distance M
+             * @description Integrated from speed, so within a percent or two of the official length
+             */
+            lap_distance_m: number;
+            /** Min Speed Kmh */
+            min_speed_kmh: number;
+            /** Max Speed Kmh */
+            max_speed_kmh: number;
+            /** Points */
+            points: components["schemas"]["TrackPointOut"][];
+            /**
+             * Corners
+             * @description Detected corners, with the map coordinate of each apex
+             */
+            corners: components["schemas"]["CornerOut"][];
+        };
+        /**
+         * TrackPointOut
+         * @description One sample of the racing line, with the speed carried there.
+         */
+        TrackPointOut: {
+            /**
+             * X
+             * @description Track coordinate, normalised to 0-1000
+             */
+            x: number;
+            /** Y */
+            y: number;
+            /** Speed Kmh */
+            speed_kmh: number;
+            /** Distance M */
+            distance_m: number;
         };
         /** UndercutResponse */
         UndercutResponse: {
@@ -1161,6 +1327,37 @@ export interface operations {
             };
         };
     };
+    get_teammates_api_v1_teammates__season__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                season: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeammatesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     compare_laps_api_v1_telemetry_compare__session_id__get: {
         parameters: {
             query: {
@@ -1184,6 +1381,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TelemetryCompareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    track_map_api_v1_telemetry_map__session_id__get: {
+        parameters: {
+            query: {
+                driver: string;
+                lap: number;
+            };
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackMapResponse"];
                 };
             };
             /** @description Validation Error */

@@ -14,6 +14,7 @@ from sqlalchemy import Engine, text
 from f1x.engine.telemetry.alignment import AlignedLap, align_lap
 from f1x.engine.telemetry.corners import Corner, compare_corners, detect_corners
 from f1x.engine.telemetry.delta import DeltaTrace, compute_delta
+from f1x.engine.telemetry.track_map import TrackMap, build_map
 
 # The lap window comes from core.laps, so telemetry is filtered on session time rather
 # than pulled per driver and sliced in Python.
@@ -89,3 +90,53 @@ def compare_laps(
         detect_corners(reference_lap), detect_corners(comparison_lap)
     )
     return trace, matches
+
+
+POSITION_QUERY = """
+    SELECT session_s, x, y
+    FROM core.positions
+    WHERE session_id = :session_id
+      AND driver_number = :driver_number
+      AND session_s BETWEEN :start_s AND :end_s
+    ORDER BY session_s
+"""
+
+
+def load_track_map(
+    engine: Engine, session_id: int, driver_number: str, lap_number: int
+) -> TrackMap | None:
+    """Build one lap's track map from its positional and car telemetry.
+
+    Scoped to the lap's own time window, so this reads through the hypertable index
+    rather than scanning 16 million position rows.
+    """
+    with engine.connect() as conn:
+        window = conn.execute(
+            text(LAP_WINDOW_QUERY),
+            {
+                "session_id": session_id,
+                "driver_number": driver_number,
+                "lap_number": lap_number,
+            },
+        ).one_or_none()
+        if window is None or window.lap_start_s is None or window.lap_end_s is None:
+            return None
+
+        params = {
+            "session_id": session_id,
+            "driver_number": driver_number,
+            "start_s": window.lap_start_s,
+            "end_s": window.lap_end_s,
+        }
+        positions = [dict(r) for r in conn.execute(text(POSITION_QUERY), params).mappings()]
+        telemetry = [dict(r) for r in conn.execute(text(TELEMETRY_QUERY), params).mappings()]
+
+    if not positions:
+        return None
+
+    return build_map(
+        pl.DataFrame(positions),
+        pl.DataFrame(telemetry) if telemetry else pl.DataFrame(),
+        driver_number=driver_number,
+        lap_number=lap_number,
+    )
