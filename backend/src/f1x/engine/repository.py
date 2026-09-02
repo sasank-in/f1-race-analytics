@@ -87,7 +87,7 @@ _COLUMNS = {
     "mart.stint_fits": (
         "session_id", "driver_number", "stint", "compound", "n_laps", "pace_s",
         "degradation_s_per_lap", "r_squared", "residual_std_s", "tyre_age_start",
-        "is_reliable",
+        "tyre_age_range", "excluded_lap_count", "is_reliable", "is_physical",
     ),
     "mart.pace_rankings": (
         "session_id", "driver_number", "n_laps", "pace_s", "best_s", "median_s",

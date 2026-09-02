@@ -118,6 +118,14 @@ class StintFitRow(Base):
     tyre_age_start: Mapped[float | None] = mapped_column(Double)
     # False when the fit is too short, too noisy, or physically implausible.
     is_reliable: Mapped[bool | None] = mapped_column(Boolean)
+    # False when the fitted slope is negative. Kept alongside the original value
+    # rather than replacing it: a negative estimate is evidence the stint could not
+    # support a reliable slope, and deleting it would hide that.
+    is_physical: Mapped[bool | None] = mapped_column(Boolean)
+    # Audit trail for the fit: how much tyre-age range it actually had to work with,
+    # and how many laps the warm-up cutoff removed.
+    tyre_age_range: Mapped[float | None] = mapped_column(Double)
+    excluded_lap_count: Mapped[int | None] = mapped_column(SmallInteger)
 
     engine_version: Mapped[str] = mapped_column(String(16))
     computed_at: Mapped[dt.datetime] = mapped_column(

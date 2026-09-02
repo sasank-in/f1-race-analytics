@@ -32,6 +32,13 @@ PolarsDataType = DataTypeClass
 # coefficients are fitted from data in a later phase.
 FUEL_EFFECT_S_PER_KG: float = 0.030
 
+# Provenance, carried explicitly so no downstream reader can mistake this for a value
+# learned from the data. Three attempts to fit it from race timing all failed for the
+# same reason — fuel_load_kg is constructed from lap number, so it carries no
+# information lap number does not already have. See engine/pace/fuel_fit.py.
+FUEL_EFFECT_SOURCE: str = "published_default"
+FUEL_EFFECT_FITTED: bool = False
+
 # Regulation maximum race fuel load. Teams start under this, but it sets the scale.
 RACE_FUEL_KG: float = 100.0
 

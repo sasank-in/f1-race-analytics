@@ -81,6 +81,33 @@ class StintFit:
     residual_std_s: float
     tyre_age_start: float
 
+    # Span of tyre age the fit actually covered. A narrow range cannot support a
+    # slope however many laps it contains.
+    tyre_age_range: float = 0.0
+    # Laps the warm-up cutoff removed, so a surprising fit can be traced back to
+    # how much of the stint the regression never saw.
+    excluded_lap_count: int = 0
+
+    @property
+    def is_physical(self) -> bool:
+        """Whether the fitted slope describes tyre wear at all.
+
+        A negative slope means the stint gave the regression too little usable
+        tyre-age range to recover degradation — typically a short run sitting in the
+        flat region after warm-up. The value is kept rather than discarded: it is
+        evidence about the stint, and deleting it would hide that the estimate failed.
+        """
+        return self.degradation_s_per_lap >= 0.0
+
+    @property
+    def downstream_degradation_s_per_lap(self) -> float:
+        """The slope strategy and simulation may use: never negative.
+
+        Tyres do not gain time by ageing, so an unphysical fit contributes nothing
+        rather than a spurious benefit an optimiser would exploit.
+        """
+        return max(0.0, self.degradation_s_per_lap)
+
     @property
     def is_reliable(self) -> bool:
         """Whether this fit should feed a degradation model.
@@ -111,7 +138,9 @@ def fit_stint(
     # Drop the warm-up phase, where the tyre is still getting quicker. Keeping it
     # would fit a line through a curve and can invert the sign of the slope.
     linear = age >= DEGRADATION_ONSET_LAPS
+    excluded = 0
     if linear.sum() >= MIN_STINT_LAPS and np.unique(age[linear]).size >= 2:
+        excluded = int(times.size - linear.sum())
         times, age = times[linear], age[linear]
 
     if times.size < MIN_STINT_LAPS or np.unique(age).size < 2:
@@ -139,6 +168,8 @@ def fit_stint(
         r_squared=r_squared,
         residual_std_s=float(np.std(residuals, ddof=1)) if times.size > 2 else 0.0,
         tyre_age_start=float(age.min()),
+        tyre_age_range=float(age.max() - age.min()),
+        excluded_lap_count=excluded,
     )
 
 
@@ -218,9 +249,19 @@ def to_frame(fits: list[StintFit]) -> pl.DataFrame:
                 "r_squared": pl.Float64,
                 "residual_std_s": pl.Float64,
                 "tyre_age_start": pl.Float64,
+                "tyre_age_range": pl.Float64,
+                "excluded_lap_count": pl.Int16,
                 "is_reliable": pl.Boolean,
+                "is_physical": pl.Boolean,
             }
         )
     return pl.DataFrame(
-        [{**fit.__dict__, "is_reliable": fit.is_reliable} for fit in fits]
+        [
+            {
+                **fit.__dict__,
+                "is_reliable": fit.is_reliable,
+                "is_physical": fit.is_physical,
+            }
+            for fit in fits
+        ]
     )

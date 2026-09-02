@@ -320,3 +320,14 @@ def test_evolution_correction_ignores_a_worsening_track() -> None:
         for lap in range(1, 61)
     ]
     assert corrections.estimate_evolution(pl.DataFrame(rows)) == 0.0
+
+
+def test_fuel_coefficient_is_declared_as_a_published_default() -> None:
+    """Provenance is part of the contract.
+
+    Three attempts to fit this from race timing failed because fuel_load_kg is
+    constructed from lap number. Marking it fitted would misrepresent the method.
+    """
+    assert corrections.FUEL_EFFECT_SOURCE == "published_default"
+    assert corrections.FUEL_EFFECT_FITTED is False
+    assert 0.025 <= corrections.FUEL_EFFECT_S_PER_KG <= 0.040

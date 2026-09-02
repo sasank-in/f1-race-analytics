@@ -307,3 +307,44 @@ def test_a_stint_too_short_to_clear_warm_up_still_fits() -> None:
     times = [90.0 + 0.1 * a for a in age]
     fit = _fit(times, age)
     assert fit is not None
+
+
+def test_negative_slope_is_flagged_but_preserved() -> None:
+    """A failed estimate is evidence, not noise. It must stay visible.
+
+    Deleting negative fits would hide that those stints could not support a slope,
+    which is exactly what the audit fields exist to show.
+    """
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    fit = _fit([90.5, 90.4, 90.3, 90.2, 90.1, 90.0], age)
+    assert fit is not None
+    assert fit.degradation_s_per_lap < 0
+    assert fit.is_physical is False
+    # The original value survives alongside the flag.
+    assert fit.degradation_s_per_lap == pytest.approx(-0.1, abs=0.01)
+
+
+def test_downstream_degradation_is_never_negative() -> None:
+    """Strategy and simulation must not be handed a tyre that gains time."""
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    fit = _fit([90.5, 90.4, 90.3, 90.2, 90.1, 90.0], age)
+    assert fit is not None
+    assert fit.downstream_degradation_s_per_lap == 0.0
+
+
+def test_positive_slope_passes_through_downstream_unchanged() -> None:
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    fit = _fit([90.0 + 0.1 * a for a in age], age)
+    assert fit is not None
+    assert fit.is_physical is True
+    assert fit.downstream_degradation_s_per_lap == pytest.approx(0.1, abs=1e-6)
+
+
+def test_fit_records_what_the_regression_actually_saw() -> None:
+    """Age range and excluded count make a surprising fit traceable."""
+    age = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    fit = _fit([90.0 + 0.1 * a for a in age], age)
+    assert fit is not None
+    # Ages 1-3 are dropped by the warm-up cutoff.
+    assert fit.excluded_lap_count == 3
+    assert fit.tyre_age_range == pytest.approx(5.0)
