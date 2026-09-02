@@ -22,6 +22,11 @@ export type RatingsResponse = Schemas["RatingsResponse"];
 export type TelemetryCompareResponse = Schemas["TelemetryCompareResponse"];
 export type DriverRating = Schemas["DriverRatingOut"];
 export type StintFit = Schemas["StintFitOut"];
+export type UndercutResponse = Schemas["UndercutResponse"];
+export type UndercutWindow = Schemas["UndercutWindowOut"];
+export type StintTimelineResponse = Schemas["StintTimelineResponse"];
+export type Stint = Schemas["StintOut"];
+export type Corner = Schemas["CornerDeltaOut"];
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -75,6 +80,9 @@ export const api = {
   degradation: (id: number) => get<DegradationResponse>(`/analysis/degradation/${id}`),
 
   strategy: (id: number) => get<StrategyResponse>(`/strategy/${id}`),
+  undercut: (id: number, maxGap = 3) =>
+    get<UndercutResponse>(`/undercut/${id}?max_gap_s=${maxGap}`),
+  stints: (id: number) => get<StintTimelineResponse>(`/stints/${id}`),
   simulate: (id: number, iterations = 2000) =>
     get<SimulationResponse>(`/simulate/${id}?iterations=${iterations}`),
   ratings: (season: number) => get<RatingsResponse>(`/ratings/${season}`),

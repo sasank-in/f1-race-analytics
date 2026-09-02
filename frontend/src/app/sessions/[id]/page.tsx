@@ -74,6 +74,35 @@ export default async function SessionPage({
           {session.total_laps ? ` · ${session.total_laps} laps` : ""}
           {!isError(pace) ? ` · engine ${pace.meta.engine_version}` : ""}
         </p>
+
+        {/* The deeper views. Telemetry only exists for sessions ingested with it,
+            so the link says so rather than leading to an error. */}
+        <nav className="mt-3 flex gap-2">
+          <Link
+            href={`/sessions/${sessionId}/strategy`}
+            className="rounded border px-2.5 py-1 text-xs"
+            style={{ borderColor: "var(--border-strong)", background: "var(--surface-1)" }}
+          >
+            Strategy &amp; undercuts →
+          </Link>
+          {session.telemetry_loaded ? (
+            <Link
+              href={`/sessions/${sessionId}/telemetry`}
+              className="rounded border px-2.5 py-1 text-xs"
+              style={{ borderColor: "var(--border-strong)", background: "var(--surface-1)" }}
+            >
+              Telemetry comparison →
+            </Link>
+          ) : (
+            <span
+              className="rounded border border-dashed px-2.5 py-1 text-xs"
+              style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+              title="Re-ingest this session with telemetry to enable the comparison"
+            >
+              Telemetry not loaded
+            </span>
+          )}
+        </nav>
       </div>
 
       <Card

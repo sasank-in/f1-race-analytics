@@ -22,8 +22,12 @@ from f1x.api.schemas import (
     RatingsResponse,
     SimulatedStrategyOut,
     SimulationResponse,
+    StintOut,
+    StintTimelineResponse,
     StrategyOptionOut,
     StrategyResponse,
+    UndercutResponse,
+    UndercutWindowOut,
 )
 from f1x.config import ENGINE_VERSION
 
@@ -136,6 +140,96 @@ def get_strategy(session_id: int) -> StrategyResponse:
     )
     cache.set(key, response.model_dump())
     return response
+
+
+@router.get("/undercut/{session_id}", response_model=UndercutResponse)
+def get_undercut(
+    session_id: int,
+    max_gap_s: float = Query(default=3.0, ge=0.5, le=10.0),
+) -> UndercutResponse:
+    """Every lap where a driver was close enough behind to try an undercut.
+
+    The arithmetic is a race between two quantities: pitting costs the net pit loss
+    and gains the difference between fresh-tyre pace and the rival's degraded pace,
+    compounded over the laps before they respond. Calls inside half a second either
+    way are reported as marginal rather than decided.
+    """
+    cache = get_cache()
+    key = ResponseCache.key(
+        "undercut", {"session_id": session_id, "max_gap_s": max_gap_s}
+    )
+    if (hit := cache.get(key)) is not None:
+        return UndercutResponse(**hit)
+
+    from f1x.engine.strategy.pit_loss import estimate_from_laps
+    from f1x.engine.strategy.undercut import scan_session
+
+    laps, stops, _, degradation, _ = _session_inputs(session_id)
+    loss = estimate_from_laps(stops, laps, session_id=session_id)
+    if loss is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"session {session_id} has too few clean pit stops to model undercuts",
+        )
+
+    windows = scan_session(
+        laps,
+        session_id=session_id,
+        degradation_s_per_lap=degradation,
+        net_pit_loss_s=loss.net_loss_s,
+        max_gap_s=max_gap_s,
+    )
+    response = UndercutResponse(
+        session_id=session_id,
+        meta=Meta(engine_version=ENGINE_VERSION),
+        degradation_s_per_lap=degradation,
+        net_pit_loss_s=loss.net_loss_s,
+        windows=[
+            UndercutWindowOut(
+                lap_number=w.lap_number,
+                attacker=w.attacker,
+                defender=w.defender,
+                gap_s=w.gap_s,
+                gain_per_lap_s=w.gain_per_lap_s,
+                total_gain_s=w.total_gain_s,
+                margin_s=w.margin_s,
+                verdict=w.verdict,
+            )
+            for w in windows
+        ],
+    )
+    cache.set(key, response.model_dump())
+    return response
+
+
+@router.get("/stints/{session_id}", response_model=StintTimelineResponse)
+def get_stints(session_id: int) -> StintTimelineResponse:
+    """Tyre stints per driver, for a strategy timeline."""
+    with get_engine().connect() as conn:
+        total_laps = conn.execute(
+            text("SELECT total_laps FROM core.sessions WHERE id = :s"), {"s": session_id}
+        ).scalar_one_or_none()
+        rows = conn.execute(
+            text(
+                "SELECT driver_number, stint, compound::text AS compound, start_lap, "
+                "       end_lap, n_laps, tyre_age_start, fresh_tyre "
+                "FROM core.stints WHERE session_id = :s "
+                "ORDER BY driver_number, stint"
+            ),
+            {"s": session_id},
+        ).mappings()
+        stints = [StintOut(**dict(row)) for row in rows]
+
+    if not stints:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"no stints for session {session_id}. Run `f1x transform` first."
+            ),
+        )
+    return StintTimelineResponse(
+        session_id=session_id, total_laps=total_laps, stints=stints
+    )
 
 
 @router.get("/simulate/{session_id}", response_model=SimulationResponse)

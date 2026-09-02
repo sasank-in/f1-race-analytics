@@ -409,6 +409,104 @@
         }
       }
     },
+    "/api/v1/undercut/{session_id}": {
+      "get": {
+        "tags": [
+          "strategy"
+        ],
+        "summary": "Get Undercut",
+        "description": "Every lap where a driver was close enough behind to try an undercut.\n\nThe arithmetic is a race between two quantities: pitting costs the net pit loss\nand gains the difference between fresh-tyre pace and the rival's degraded pace,\ncompounded over the laps before they respond. Calls inside half a second either\nway are reported as marginal rather than decided.",
+        "operationId": "get_undercut_api_v1_undercut__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "max_gap_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 10.0,
+              "minimum": 0.5,
+              "default": 3.0,
+              "title": "Max Gap S"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndercutResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stints/{session_id}": {
+      "get": {
+        "tags": [
+          "strategy"
+        ],
+        "summary": "Get Stints",
+        "description": "Tyre stints per driver, for a strategy timeline.",
+        "operationId": "get_stints_api_v1_stints__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StintTimelineResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/simulate/{session_id}": {
       "get": {
         "tags": [
@@ -1420,6 +1518,105 @@
         ],
         "title": "StintFitOut"
       },
+      "StintOut": {
+        "properties": {
+          "driver_number": {
+            "type": "string",
+            "title": "Driver Number"
+          },
+          "stint": {
+            "type": "integer",
+            "title": "Stint"
+          },
+          "compound": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compound"
+          },
+          "start_lap": {
+            "type": "integer",
+            "title": "Start Lap"
+          },
+          "end_lap": {
+            "type": "integer",
+            "title": "End Lap"
+          },
+          "n_laps": {
+            "type": "integer",
+            "title": "N Laps"
+          },
+          "tyre_age_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tyre Age Start"
+          },
+          "fresh_tyre": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fresh Tyre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "driver_number",
+          "stint",
+          "start_lap",
+          "end_lap",
+          "n_laps"
+        ],
+        "title": "StintOut",
+        "description": "One run on a set of tyres, for the timeline."
+      },
+      "StintTimelineResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "total_laps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Laps"
+          },
+          "stints": {
+            "items": {
+              "$ref": "#/components/schemas/StintOut"
+            },
+            "type": "array",
+            "title": "Stints"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "stints"
+        ],
+        "title": "StintTimelineResponse"
+      },
       "StrategyOptionOut": {
         "properties": {
           "n_stops": {
@@ -1544,6 +1741,93 @@
           "corners"
         ],
         "title": "TelemetryCompareResponse"
+      },
+      "UndercutResponse": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "degradation_s_per_lap": {
+            "type": "number",
+            "title": "Degradation S Per Lap"
+          },
+          "net_pit_loss_s": {
+            "type": "number",
+            "title": "Net Pit Loss S"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/UndercutWindowOut"
+            },
+            "type": "array",
+            "title": "Windows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "meta",
+          "degradation_s_per_lap",
+          "net_pit_loss_s",
+          "windows"
+        ],
+        "title": "UndercutResponse"
+      },
+      "UndercutWindowOut": {
+        "properties": {
+          "lap_number": {
+            "type": "integer",
+            "title": "Lap Number"
+          },
+          "attacker": {
+            "type": "string",
+            "title": "Attacker"
+          },
+          "defender": {
+            "type": "string",
+            "title": "Defender"
+          },
+          "gap_s": {
+            "type": "number",
+            "title": "Gap S"
+          },
+          "gain_per_lap_s": {
+            "type": "number",
+            "title": "Gain Per Lap S",
+            "description": "Per-lap advantage a fresh set gives over the rival's worn tyres"
+          },
+          "total_gain_s": {
+            "type": "number",
+            "title": "Total Gain S"
+          },
+          "margin_s": {
+            "type": "number",
+            "title": "Margin S",
+            "description": "How much the undercut wins or misses by. Negative means it fails."
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict",
+            "description": "undercut, hold, or marginal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lap_number",
+          "attacker",
+          "defender",
+          "gap_s",
+          "gain_per_lap_s",
+          "total_gain_s",
+          "margin_s",
+          "verdict"
+        ],
+        "title": "UndercutWindowOut",
+        "description": "One lap where a driver was close enough behind to try an undercut."
       },
       "ValidationError": {
         "properties": {

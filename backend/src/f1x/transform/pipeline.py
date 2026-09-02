@@ -34,6 +34,7 @@ METRIC_COLUMNS = (
     "stint",
     "compound",
     "tyre_life",
+    "position",
 )
 
 

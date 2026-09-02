@@ -198,6 +198,50 @@ class StrategyResponse(BaseModel):
     )
 
 
+class UndercutWindowOut(BaseModel):
+    """One lap where a driver was close enough behind to try an undercut."""
+
+    lap_number: int
+    attacker: str
+    defender: str
+    gap_s: float
+    gain_per_lap_s: float = Field(
+        description="Per-lap advantage a fresh set gives over the rival's worn tyres"
+    )
+    total_gain_s: float
+    margin_s: float = Field(
+        description="How much the undercut wins or misses by. Negative means it fails."
+    )
+    verdict: str = Field(description="undercut, hold, or marginal")
+
+
+class UndercutResponse(BaseModel):
+    session_id: int
+    meta: Meta
+    degradation_s_per_lap: float
+    net_pit_loss_s: float
+    windows: list[UndercutWindowOut]
+
+
+class StintOut(BaseModel):
+    """One run on a set of tyres, for the timeline."""
+
+    driver_number: str
+    stint: int
+    compound: str | None = None
+    start_lap: int
+    end_lap: int
+    n_laps: int
+    tyre_age_start: float | None = None
+    fresh_tyre: bool | None = None
+
+
+class StintTimelineResponse(BaseModel):
+    session_id: int
+    total_laps: int | None = None
+    stints: list[StintOut]
+
+
 # --------------------------------------------------------------------------
 # telemetry
 # --------------------------------------------------------------------------

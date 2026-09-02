@@ -176,6 +176,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/undercut/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Undercut
+         * @description Every lap where a driver was close enough behind to try an undercut.
+         *
+         *     The arithmetic is a race between two quantities: pitting costs the net pit loss
+         *     and gains the difference between fresh-tyre pace and the rival's degraded pace,
+         *     compounded over the laps before they respond. Calls inside half a second either
+         *     way are reported as marginal rather than decided.
+         */
+        get: operations["get_undercut_api_v1_undercut__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stints/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stints
+         * @description Tyre stints per driver, for a strategy timeline.
+         */
+        get: operations["get_stints_api_v1_stints__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/simulate/{session_id}": {
         parameters: {
             query?: never;
@@ -595,6 +640,37 @@ export interface components {
              */
             excluded_lap_count?: number | null;
         };
+        /**
+         * StintOut
+         * @description One run on a set of tyres, for the timeline.
+         */
+        StintOut: {
+            /** Driver Number */
+            driver_number: string;
+            /** Stint */
+            stint: number;
+            /** Compound */
+            compound?: string | null;
+            /** Start Lap */
+            start_lap: number;
+            /** End Lap */
+            end_lap: number;
+            /** N Laps */
+            n_laps: number;
+            /** Tyre Age Start */
+            tyre_age_start?: number | null;
+            /** Fresh Tyre */
+            fresh_tyre?: boolean | null;
+        };
+        /** StintTimelineResponse */
+        StintTimelineResponse: {
+            /** Session Id */
+            session_id: number;
+            /** Total Laps */
+            total_laps?: number | null;
+            /** Stints */
+            stints: components["schemas"]["StintOut"][];
+        };
         /** StrategyOptionOut */
         StrategyOptionOut: {
             /** N Stops */
@@ -646,6 +722,49 @@ export interface components {
             delta_s: number[];
             /** Corners */
             corners: components["schemas"]["CornerDeltaOut"][];
+        };
+        /** UndercutResponse */
+        UndercutResponse: {
+            /** Session Id */
+            session_id: number;
+            meta: components["schemas"]["Meta"];
+            /** Degradation S Per Lap */
+            degradation_s_per_lap: number;
+            /** Net Pit Loss S */
+            net_pit_loss_s: number;
+            /** Windows */
+            windows: components["schemas"]["UndercutWindowOut"][];
+        };
+        /**
+         * UndercutWindowOut
+         * @description One lap where a driver was close enough behind to try an undercut.
+         */
+        UndercutWindowOut: {
+            /** Lap Number */
+            lap_number: number;
+            /** Attacker */
+            attacker: string;
+            /** Defender */
+            defender: string;
+            /** Gap S */
+            gap_s: number;
+            /**
+             * Gain Per Lap S
+             * @description Per-lap advantage a fresh set gives over the rival's worn tyres
+             */
+            gain_per_lap_s: number;
+            /** Total Gain S */
+            total_gain_s: number;
+            /**
+             * Margin S
+             * @description How much the undercut wins or misses by. Negative means it fails.
+             */
+            margin_s: number;
+            /**
+             * Verdict
+             * @description undercut, hold, or marginal
+             */
+            verdict: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -901,6 +1020,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_undercut_api_v1_undercut__session_id__get: {
+        parameters: {
+            query?: {
+                max_gap_s?: number;
+            };
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndercutResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stints_api_v1_stints__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StintTimelineResponse"];
                 };
             };
             /** @description Validation Error */

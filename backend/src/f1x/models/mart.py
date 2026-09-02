@@ -83,6 +83,9 @@ class LapMetric(Base):
     stint: Mapped[int | None] = mapped_column(SmallInteger)
     compound: Mapped[str | None] = mapped_column(String(16))
     tyre_life: Mapped[float | None] = mapped_column(Double)
+    # Track position at the end of the lap. Carried through from core.laps because
+    # the undercut scanner needs it to know which car was ahead of which.
+    position: Mapped[float | None] = mapped_column(Double)
 
     engine_version: Mapped[str] = mapped_column(String(16))
     computed_at: Mapped[dt.datetime] = mapped_column(

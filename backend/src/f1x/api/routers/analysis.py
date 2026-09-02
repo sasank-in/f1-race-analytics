@@ -72,8 +72,7 @@ def get_laps(
 
     sql = (
         "SELECT driver_number, lap_number, lap_time_s, compound, tyre_life, stint, "
-        "       is_representative, exclusion_reason, fuel_corrected_s, "
-        "       NULL::double precision AS position "
+        "       is_representative, exclusion_reason, fuel_corrected_s, position "
         "FROM mart.lap_metrics WHERE session_id = :s AND engine_version = :v "
     )
     params: dict[str, object] = {"s": session_id, "v": ENGINE_VERSION}

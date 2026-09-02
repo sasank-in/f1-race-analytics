@@ -92,12 +92,12 @@ def transform_and_store(engine: Engine, session_id: int) -> TransformResult:
                     "is_green, is_in_lap, is_out_lap, is_representative, exclusion_reason, "
                     "fuel_corrected_s, fuel_load_kg, evolution_corrected_s, "
                     "gap_ahead_s, gap_behind_s, is_clean_air, "
-                    "stint, compound, tyre_life, engine_version) "
+                    "stint, compound, tyre_life, position, engine_version) "
                     "VALUES (:session_id, :driver_number, :lap_number, :lap_time_s, "
                     ":is_green, :is_in_lap, :is_out_lap, :is_representative, :exclusion_reason, "
                     ":fuel_corrected_s, :fuel_load_kg, :evolution_corrected_s, "
                     ":gap_ahead_s, :gap_behind_s, :is_clean_air, "
-                    ":stint, :compound, :tyre_life, :engine_version)"
+                    ":stint, :compound, :tyre_life, :position, :engine_version)"
                 ),
                 rows,
             )
