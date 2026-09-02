@@ -27,7 +27,8 @@ between seasons at the same circuit. Of 20 circuits appearing in both 2022 and 2
 17 ran *identical* lap counts. There is no cross-season variation to exploit.
 
 **A pooled regression with stint fixed effects was also tried, and also fails.** Pooling
-all 44 races and adding a quadratic tyre-age term (the design in `reg.txt`) does produce
+all 44 races and adding a quadratic tyre-age term (the design in
+`docs/fuel-and-degradation-methodology.md`) does produce
 a plausible-looking number: beta_fuel = +0.049 s/kg over 36,642 laps, r-squared 0.996,
 sitting neatly in the published 0.025-0.040 band.
 

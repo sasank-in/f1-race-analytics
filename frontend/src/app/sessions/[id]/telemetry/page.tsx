@@ -210,6 +210,21 @@ export default function TelemetryPage({
               <Empty message="No corners matched between these laps." />
             ) : (
               <div className="space-y-2">
+                {/* Column headers above the rows: the same labels underneath read as
+                    a footnote, found only after the reader has guessed. */}
+                <div
+                  className="flex gap-3 border-b pb-1.5 text-xs"
+                  style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                >
+                  <span className="w-6">turn</span>
+                  <span className="w-16 text-right">apex</span>
+                  <span className="w-14 text-right">#{result.reference_driver}</span>
+                  <span className="w-14 text-right">#{result.comparison_driver}</span>
+                  <span className="flex-1 text-center">
+                    km/h difference at the apex
+                  </span>
+                  <span className="w-14 text-right">delta</span>
+                </div>
                 {result.corners.map((corner) => {
                   const faster = corner.delta_kmh > 0;
                   const magnitude = Math.min(
@@ -265,19 +280,7 @@ export default function TelemetryPage({
                     </div>
                   );
                 })}
-                <div
-                  className="flex gap-3 border-t pt-2 text-xs"
-                  style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                >
-                  <span className="w-6">turn</span>
-                  <span className="w-16 text-right">apex</span>
-                  <span className="w-14 text-right">#{result.reference_driver}</span>
-                  <span className="w-14 text-right">#{result.comparison_driver}</span>
-                  <span className="flex-1 text-center">
-                    km/h difference at the apex
-                  </span>
-                  <span className="w-14 text-right">delta</span>
-                </div>
+
               </div>
             )}
           </Card>

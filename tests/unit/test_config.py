@@ -6,7 +6,7 @@ from f1x.config import ENGINE_VERSION, ROOT, Settings, get_settings
 
 
 def test_root_points_at_repo() -> None:
-    assert (ROOT / "ARCHITECTURE.md").is_file()
+    assert (ROOT / "docs" / "architecture.md").is_file()
 
 
 def test_database_url_uses_psycopg_driver() -> None:

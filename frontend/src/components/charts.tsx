@@ -35,6 +35,20 @@ export function PaceChart({ data }: { data: PaceResponse }) {
 
   return (
     <div className="space-y-1">
+      {/* Column headers. These label what follows, so they belong above the rows —
+          the same text underneath reads as a footnote and is found only after the
+          reader has already guessed what each column meant. */}
+      <div
+        className="flex gap-3 border-b pb-1.5 text-xs"
+        style={{ color: "var(--text-muted)", borderColor: "var(--border)" }}
+      >
+        <span className="w-5" />
+        <span className="w-8">car</span>
+        <span className="flex-1">gap to fastest</span>
+        <span className="w-16 text-right">gap</span>
+        <span className="w-20 text-right">pace</span>
+        <span className="w-10 text-right">laps</span>
+      </div>
       {drivers.map((driver) => {
         const width = (driver.gap_to_best_s / maxGap) * 100;
         const isHovered = hovered === driver.driver_number;
@@ -97,17 +111,6 @@ export function PaceChart({ data }: { data: PaceResponse }) {
           </div>
         );
       })}
-      <div
-        className="flex gap-3 pt-2 text-xs"
-        style={{ color: "var(--text-muted)" }}
-      >
-        <span className="w-5" />
-        <span className="w-8">car</span>
-        <span className="flex-1">gap to fastest</span>
-        <span className="w-16 text-right">gap</span>
-        <span className="w-20 text-right">pace</span>
-        <span className="w-10 text-right">laps</span>
-      </div>
     </div>
   );
 }
