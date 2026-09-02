@@ -120,6 +120,21 @@ Two details in the feed shape the schema more than they might appear to:
 
 ## Quick start
 
+On Windows, `start.bat` brings up all four pieces in order and opens the UI:
+
+```
+start.bat            database, cache, API and UI
+start.bat --prod     the same, with the optimised UI build
+start.bat --stop     stop the API and UI, leave containers running
+start.bat --down     stop everything
+```
+
+It waits for each service to actually answer rather than sleeping a fixed time, and
+frees ports 8000 and 3000 first — a stale Next.js server serves an old build whose CSS
+hash no longer exists, which renders the page completely unstyled.
+
+To run the pieces by hand:
+
 ```bash
 # 1. database and cache
 docker compose -f docker/docker-compose.yml up -d
