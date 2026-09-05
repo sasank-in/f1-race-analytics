@@ -6,7 +6,6 @@ A results table says Alonso beat Leclerc at Bahrain 2023. This engine says Lecle
 the third-quickest car and retired from it. Across 2022 and 2023, **the quickest car did
 not win 18 of 44 races** — and those are the races worth studying.
 
----
 
 ## The problem it solves
 
@@ -47,7 +46,6 @@ MEDIUM 0.055 > HARD 0.048 s/lap. Again unenforced, and the correct physical orde
 the true length across eight circuits, erring consistently short — the signature of
 trapezoidal integration, not noise.
 
----
 
 ## Dataset
 
@@ -62,7 +60,6 @@ trapezoidal integration, not noise.
 | UI pages | 7 |
 | Tests | 260 |
 
----
 
 ## Architecture
 
@@ -103,7 +100,6 @@ one chart.
 API field says so and the UI repeats it. A number that travels without its provenance
 gets treated as fact.
 
----
 
 ## Quick start
 
@@ -139,7 +135,6 @@ runs the database only — Python and Next.js run natively.
 Telemetry roughly triples ingest time. `--no-telemetry` gives a timing-only load; re-run
 without the flag to add traces.
 
----
 
 ## Layout
 
@@ -181,7 +176,6 @@ which is how CI runs.
 | [Operations](docs/operations.md) | Ingestion, migrations, running the services |
 | [Fuel and degradation](docs/fuel-and-degradation-methodology.md) | The two modelling limits, in detail |
 
----
 
 ## Known limits
 
@@ -208,7 +202,6 @@ benefit.
 **Degradation and strategy are inferred.** They reconstruct what the timing data
 supports. Tyre state, fuel load and engine modes are never observed directly.
 
----
 
 ## Status
 
