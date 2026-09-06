@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Nav } from "@/components/nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,20 +21,7 @@ export default function RootLayout({
             <Link href="/" className="text-base font-semibold tracking-tight">
               F1 Race Analysis Engine
             </Link>
-            <nav className="flex gap-5 text-sm">
-              <Link href="/" style={{ color: "var(--text-secondary)" }}>
-                Sessions
-              </Link>
-              <Link href="/season" style={{ color: "var(--text-secondary)" }}>
-                Season
-              </Link>
-              <Link href="/teammates" style={{ color: "var(--text-secondary)" }}>
-                Teammates
-              </Link>
-              <Link href="/ratings" style={{ color: "var(--text-secondary)" }}>
-                Ratings
-              </Link>
-            </nav>
+            <Nav />
           </header>
           {children}
           <footer
