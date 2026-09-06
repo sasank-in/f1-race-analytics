@@ -19,13 +19,15 @@ from f1x.engine.pace.stint_model import fit_session, fit_stint, to_frame
 # --------------------------------------------------------------------------
 
 
-def _fit(times: list[float], age: list[float]) -> stint_model.StintFit | None:
+def _fit(
+    times: list[float], age: list[float], *, stint: int = 1
+) -> stint_model.StintFit | None:
     return fit_stint(
         np.array(times),
         np.array(age),
         session_id=1,
         driver_number="44",
-        stint=1,
+        stint=stint,
         compound="SOFT",
     )
 
@@ -50,6 +52,58 @@ def test_pace_is_the_zero_age_intercept_not_the_average() -> None:
     assert fit is not None
     assert fit.pace_s == pytest.approx(90.0, abs=1e-6)
     assert fit.pace_s < float(np.mean(times))
+
+
+def test_reference_pace_is_read_at_the_youngest_observed_age() -> None:
+    """``pace_s`` back-casts to age zero; ``reference_pace_s`` does not extrapolate."""
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    times = [90.0 + 0.15 * a for a in age]
+    fit = _fit(times, age)
+    assert fit is not None
+    assert fit.pace_s == pytest.approx(90.0, abs=1e-6)
+    assert fit.reference_pace_s == pytest.approx(90.0 + 0.15 * 4, abs=1e-6)
+
+
+def test_reference_pace_does_not_favour_the_faster_degrading_stint() -> None:
+    """The bias this field exists to remove.
+
+    Two stints with identical lap times at every age the fit actually saw, differing
+    only in slope. Back-casting to age zero rewards the steeper one — it is
+    extrapolated further — and would report it as the quicker car when it was not.
+    """
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    pivot = 4.0
+    gentle = [92.0 + 0.05 * (a - pivot) for a in age]
+    steep = [92.0 + 0.15 * (a - pivot) for a in age]
+
+    gentle_fit = _fit(gentle, age)
+    steep_fit = _fit(steep, age)
+    assert gentle_fit is not None and steep_fit is not None
+
+    # Both were doing 92.0 at the youngest age either fit observed.
+    assert gentle_fit.reference_pace_s == pytest.approx(92.0, abs=1e-6)
+    assert steep_fit.reference_pace_s == pytest.approx(92.0, abs=1e-6)
+
+    # The zero-age intercept disagrees, and by more than a real pace gap.
+    assert steep_fit.pace_s < gentle_fit.pace_s - 0.3
+
+
+def test_curves_pool_the_unextrapolated_pace() -> None:
+    """A compound's median pace must not inherit the extrapolation bias."""
+    from f1x.engine.degradation import curves as curves_module
+    from f1x.engine.pace.stint_model import to_frame
+
+    age = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+    fits = [
+        _fit([92.0 + 0.15 * (a - 4.0) for a in age], age, stint=i)
+        for i in range(1, 4)
+    ]
+    frame = to_frame([f for f in fits if f is not None])
+    built = curves_module.build_curves(frame)
+
+    assert len(built) == 1
+    # 92.0 is what the cars were doing at age 4; the zero-age intercept is ~91.4.
+    assert built[0].median_pace_s == pytest.approx(92.0, abs=1e-6)
 
 
 def test_short_stint_is_not_fitted() -> None:

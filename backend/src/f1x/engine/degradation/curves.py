@@ -37,7 +37,10 @@ class DegradationCurve:
     # Interquartile spread of the per-stint slopes — the honest width of the estimate.
     degradation_iqr_s: float
 
-    # Typical pace on a fresh set, for comparing compounds against each other.
+    # Typical pace for comparing compounds against each other, read at a fixed tyre
+    # age rather than back-cast to zero. See ``StintFit.reference_pace_s``: the
+    # zero-age intercept is extrapolated, and extrapolated furthest for the compounds
+    # that degrade fastest, which biased exactly the comparison this field exists for.
     median_pace_s: float
     # Longest stint anyone completed. An upper bound on observed usable life, not a
     # prediction of where the cliff is.
@@ -70,6 +73,19 @@ class DegradationCurve:
         return self.max_stint_laps
 
 
+def _pace_column(group: pl.DataFrame) -> np.ndarray:
+    """Per-stint pace to pool, preferring the unextrapolated reference.
+
+    ``reference_pace_s`` is derived rather than stored, so a frame assembled before it
+    existed will not carry it. Falling back to ``pace_s`` keeps such a frame working
+    at the cost of the extrapolation bias it was added to remove — acceptable for a
+    stale input, not for a fresh one.
+    """
+    if "reference_pace_s" in group.columns:
+        return group.get_column("reference_pace_s").to_numpy()
+    return group.get_column("pace_s").to_numpy()
+
+
 def build_curves(stint_fits: pl.DataFrame) -> list[DegradationCurve]:
     """Pool reliable stint fits into one curve per compound."""
     if stint_fits.is_empty() or "is_reliable" not in stint_fits.columns:
@@ -96,7 +112,7 @@ def build_curves(stint_fits: pl.DataFrame) -> list[DegradationCurve]:
                 degradation_iqr_s=float(
                     np.percentile(slopes, 75) - np.percentile(slopes, 25)
                 ),
-                median_pace_s=float(np.median(group.get_column("pace_s").to_numpy())),
+                median_pace_s=float(np.median(_pace_column(group))),
                 max_stint_laps=int(str(group.get_column("n_laps").max())),
             )
         )
