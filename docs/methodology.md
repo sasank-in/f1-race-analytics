@@ -191,7 +191,13 @@ That check needed strengthening. On pure noise the ridge fit scored a **16.5 % l
 MAE** than grid position — predicting the middle of the field beats predicting the
 extremes when outcomes are uniform — while its rank correlation was **−0.12**, ordering
 the field backwards. Mean error alone cannot reject a useless model, so the comparison
-now requires better rank correlation too.
+also requires better rank correlation.
+
+**That is still not sufficient.** Repeating the noise experiment across 30 seeds, the
+model is declared better than the baseline in **17 of them** — the two rank correlations
+are both indistinguishable from zero, so which one lands higher is a coin toss. The
+model is therefore not exposed through the CLI or the API. Measurements and the fix it
+would need are in [models-and-training.md](models-and-training.md#where-this-gate-is-still-too-weak).
 
 **Driver ratings** score pace, racecraft, consistency and tyre management, each
 normalised across the field being compared. Tyre management is measured within compound
