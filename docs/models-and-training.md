@@ -175,6 +175,11 @@ with chaotic stops is visibly noisier.
 Not trained — it *consumes* the fitted degradation and pit-loss values and samples
 outcomes.
 
+Tyre age runs 1..n within a stint, matching `tyre_life` in the data and the optimiser's
+`degradation_cost`. All three previously disagreed with each other by one lap of wear
+in places; the offset is `slope × total_laps`, identical across strategies, so it never
+moved a ranking — but both modules report absolute figures, so it is now consistent.
+
 Per iteration: lap times from the deterministic pace-plus-degradation model, Gaussian
 lap noise, a Bernoulli draw for a safety car with a uniformly placed start lap, and
 Gaussian noise on each pit loss.

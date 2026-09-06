@@ -85,6 +85,38 @@ def test_empty_input_gives_no_estimate() -> None:
 # --------------------------------------------------------------------------
 
 
+def test_degradation_cost_counts_every_lap_of_wear() -> None:
+    """Tyre age is 1 on a stint's first lap, so an n-lap stint accumulates ages 1..n.
+
+    Summing 0..n-1 instead understates each stint by one lap's wear. It cancels in the
+    stop-count comparison, so it never moved a recommendation, but `degradation_cost_s`
+    is served by the API on its own.
+    """
+    slope = 0.1
+    for laps in (1, 2, 3, 10, 20):
+        expected = slope * sum(range(1, laps + 1))
+        assert optimiser.degradation_cost(laps, slope) == pytest.approx(expected)
+
+
+def test_the_one_lap_offset_cannot_change_the_ranking() -> None:
+    """Why the arithmetic error was invisible: it is constant across stop counts.
+
+    The difference between the two conventions is slope x total_laps however the race
+    is divided, so it shifts every option equally and cancels in the comparison.
+    """
+    total_laps, slope = 57, 0.143
+    shortfalls = [
+        sum(
+            optimiser.degradation_cost(stint, slope)
+            - slope * stint * (stint - 1) / 2.0
+            for stint in optimiser.split_evenly(total_laps, stints)
+        )
+        for stints in range(1, 6)
+    ]
+    # Every stop count is shifted by the same amount, so the ordering is untouched.
+    assert shortfalls == pytest.approx([slope * total_laps] * len(shortfalls))
+
+
 def test_degradation_cost_is_quadratic_in_stint_length() -> None:
     """Doubling a stint more than doubles its degradation cost — the reason to split."""
     short = optimiser.degradation_cost(10, 0.1)

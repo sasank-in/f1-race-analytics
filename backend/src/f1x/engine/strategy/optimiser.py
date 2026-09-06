@@ -55,9 +55,17 @@ class StrategyOption:
 def degradation_cost(stint_laps: int, slope_s_per_lap: float) -> float:
     """Time lost to degradation over one stint.
 
-    Lap n of a stint carries n laps of wear, so the total is the slope times the sum
-    of 1..n — quadratic in stint length. That quadratic growth is precisely why
-    splitting a long stint pays, and why the pit loss has to be weighed against it.
+    Tyre age is 1 on a stint's first lap (matching ``tyre_life`` in the data, which
+    starts at 1), so an ``n``-lap stint accumulates ages 1..n and the total is the
+    slope times ``n(n + 1) / 2`` — quadratic in stint length. That quadratic growth is
+    precisely why splitting a long stint pays, and why the pit loss has to be weighed
+    against it.
+
+    This previously summed 0..n-1, understating every stint by one lap's wear. It did
+    not change any recommendation: the shortfall is ``slope * total_laps`` whatever the
+    stop count, so it cancelled in the comparison. It did understate the reported
+    ``degradation_cost_s`` — by 8.2 s over a Sakhir race — which is a number the API
+    serves on its own.
 
     A negative slope is clamped to zero. Tyres do not get faster with age; a negative
     fitted slope means the fuel correction over-corrected, which happens at low
@@ -67,7 +75,7 @@ def degradation_cost(stint_laps: int, slope_s_per_lap: float) -> float:
     """
     if stint_laps <= 0:
         return 0.0
-    return max(0.0, slope_s_per_lap) * stint_laps * (stint_laps - 1) / 2.0
+    return max(0.0, slope_s_per_lap) * stint_laps * (stint_laps + 1) / 2.0
 
 
 def split_evenly(total_laps: int, n_stints: int) -> tuple[int, ...]:

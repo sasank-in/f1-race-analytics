@@ -104,8 +104,12 @@ def simulate_strategy(
     if total_laps <= 0:
         raise ValueError("stint_lengths must cover at least one lap")
 
-    # Tyre age on each lap: restarts at zero for every stint.
-    tyre_age = np.concatenate([np.arange(length) for length in stint_lengths])
+    # Tyre age on each lap, restarting at every stop. Ages run 1..n rather than
+    # 0..n-1, matching `tyre_life` in the data and `optimiser.degradation_cost`: a
+    # stint's first lap is already a lap of wear. Using 0-based ages understated every
+    # simulated race by slope x total_laps — constant across strategies, so it never
+    # changed a comparison, but these results are reported as absolute race times.
+    tyre_age = np.concatenate([np.arange(1, length + 1) for length in stint_lengths])
     # Clamped for the same reason as the optimiser: a tyre never gains time by ageing.
     slope = max(0.0, conditions.degradation_s_per_lap)
     deterministic = conditions.base_lap_s + slope * tyre_age

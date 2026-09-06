@@ -39,6 +39,33 @@ def test_simulation_is_reproducible_with_a_seed() -> None:
     assert first.median_s == second.median_s
 
 
+def test_tyre_age_starts_at_one_on_a_fresh_set() -> None:
+    """The simulation must agree with the optimiser and with `tyre_life` in the data.
+
+    A stint's opening lap already carries a lap of wear, so ages run 1..n. Counting
+    from zero understated every simulated race by slope x total_laps — invisible in a
+    comparison, since it shifts all strategies equally, but these are reported as
+    absolute race times.
+    """
+    laps, slope, base = 10, 0.2, 90.0
+    result = simulate_strategy(
+        _conditions(
+            total_laps=laps,
+            base_lap_s=base,
+            degradation_s_per_lap=slope,
+            lap_time_noise_s=0.0,
+            safety_car_probability=0.0,
+        ),
+        (laps,),
+        # Two iterations, not one: std(ddof=1) is undefined for a single sample and
+        # numpy warns. With zero noise both iterations are identical anyway.
+        iterations=2,
+        seed=0,
+    )
+    expected = laps * base + slope * sum(range(1, laps + 1))
+    assert result.median_s == pytest.approx(expected)
+
+
 def test_race_time_is_roughly_laps_times_pace() -> None:
     """A sanity check that the walk over laps accumulates the right order of magnitude."""
     result = simulate_strategy(
