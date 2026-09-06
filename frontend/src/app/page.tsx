@@ -31,7 +31,19 @@ export default async function RacesPage() {
   }
 
   if (races.length === 0) {
-    return <Empty message="No races ingested yet. Run `f1x ingest backfill` first." />;
+    // An empty database is the one state where the fetch page is the whole application,
+    // so point at it rather than at a terminal command.
+    return (
+      <div className="space-y-4">
+        <Empty message="No races loaded yet." />
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          <Link href="/fetch" className="underline underline-offset-2">
+            Fetch one from the archive
+          </Link>
+          , or run <code>f1x ingest backfill</code> from a terminal.
+        </p>
+      </div>
+    );
   }
 
   const bySeason = new Map<number, SessionSummary[]>();

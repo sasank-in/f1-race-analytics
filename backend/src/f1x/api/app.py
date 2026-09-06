@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from f1x.api.deps import get_cache, get_engine
-from f1x.api.routers import analysis, reference, season, strategy, telemetry
+from f1x.api.routers import analysis, fetch, reference, season, strategy, telemetry
 from f1x.config import ENGINE_VERSION, get_settings
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,9 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
         allow_credentials=True,
-        allow_methods=["GET"],
+        # POST is needed to start a fetch. Still no PUT or DELETE: nothing in this
+        # API edits or removes stored data.
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 
@@ -80,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(strategy.router, prefix=api)
     app.include_router(telemetry.router, prefix=api)
     app.include_router(season.router, prefix=api)
+    app.include_router(fetch.router, prefix=api)
 
     @app.get("/health", tags=["ops"])
     def health() -> dict[str, Any]:

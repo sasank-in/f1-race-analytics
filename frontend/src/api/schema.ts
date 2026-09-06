@@ -411,6 +411,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/schedule/{season}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Schedule
+         * @description The published calendar for a season, marking what is already stored.
+         *
+         *     Works for a season that has never been ingested — that is how a client discovers
+         *     races worth fetching.
+         */
+        get: operations["get_schedule_api_v1_schedule__season__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fetch Jobs
+         * @description Recent fetches, newest first. In-memory, so empty after a restart.
+         */
+        get: operations["list_fetch_jobs_api_v1_fetch_get"];
+        put?: never;
+        /**
+         * Start Fetch Job
+         * @description Fetch one session from the archive and run it through the full pipeline.
+         *
+         *     Returns 202 with a job to poll. Re-fetching a race already stored is allowed and
+         *     replaces it — that is how a session ingested without telemetry gains its traces.
+         */
+        post: operations["start_fetch_job_api_v1_fetch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fetch/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fetch Job
+         * @description Poll one fetch.
+         *
+         *     A 404 after a restart means the job record was lost, not that the race was — check
+         *     the schedule, which reads the database rather than this registry.
+         */
+        get: operations["get_fetch_job_api_v1_fetch__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -516,7 +589,10 @@ export interface components {
              * @description Interquartile spread: the honest width of the estimate
              */
             degradation_iqr_s: number;
-            /** Median Pace S */
+            /**
+             * Median Pace S
+             * @description Median stint pace read at a fixed tyre age, not back-cast to zero, so compounds that degrade at different rates stay comparable.
+             */
             median_pace_s: number;
             /**
              * Max Stint Laps
@@ -571,6 +647,97 @@ export interface components {
             circuit_key?: string | null;
             /** Event Date */
             event_date?: string | null;
+        };
+        /**
+         * FetchJobOut
+         * @description Progress of an on-demand fetch.
+         *
+         *     A fetch runs ingest, transform and analyse in turn, so `state` names the stage and
+         *     the job is only `complete` once the race is actually viewable.
+         */
+        FetchJobOut: {
+            /** Id */
+            id: string;
+            /** Year */
+            year: number;
+            /** Round */
+            round: number;
+            /** Kind */
+            kind: string;
+            /** Telemetry */
+            telemetry: boolean;
+            /**
+             * State
+             * @description queued, ingesting, transforming, analysing, complete or failed
+             */
+            state: string;
+            /**
+             * Detail
+             * @description Human-readable description of the current stage
+             */
+            detail: string;
+            /**
+             * Progress
+             * @description Rough completion fraction
+             */
+            progress: number;
+            /**
+             * Session Id
+             * @description Set once ingestion has written the session
+             */
+            session_id?: number | null;
+            /**
+             * Laps
+             * @default 0
+             */
+            laps: number;
+            /**
+             * Telemetry Samples
+             * @default 0
+             */
+            telemetry_samples: number;
+            /**
+             * Warnings
+             * @description Data-quality warnings raised during ingestion
+             */
+            warnings?: string[];
+            /** Error */
+            error?: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at?: string | null;
+        };
+        /**
+         * FetchRequest
+         * @description What to fetch. Race sessions are the default because they are what the engine analyses.
+         */
+        FetchRequest: {
+            /**
+             * Year
+             * @description Season year
+             */
+            year: number;
+            /**
+             * Round
+             * @description Round number within the season
+             */
+            round: number;
+            /**
+             * Kind
+             * @description FP1, FP2, FP3, Q, SQ, S or R
+             * @default R
+             */
+            kind: string;
+            /**
+             * Telemetry
+             * @description Telemetry roughly triples fetch time; false gives a timing-only load
+             * @default true
+             */
+            telemetry: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -710,6 +877,53 @@ export interface components {
             note: string;
             /** Drivers */
             drivers: components["schemas"]["DriverRatingOut"][];
+        };
+        /** ScheduleResponse */
+        ScheduleResponse: {
+            /** Season */
+            season: number;
+            /**
+             * Source
+             * @description The calendar comes from the archive, not the local database
+             * @default FastF1 event schedule
+             */
+            source: string;
+            /** Races */
+            races: components["schemas"]["ScheduledRaceOut"][];
+        };
+        /**
+         * ScheduledRaceOut
+         * @description One round of a published calendar, with its local status.
+         *
+         *     Unlike every other model here, this describes a race that may not be in the
+         *     database — that is the point, since it is how a client finds something to fetch.
+         */
+        ScheduledRaceOut: {
+            /** Season */
+            season: number;
+            /** Round */
+            round: number;
+            /** Name */
+            name: string;
+            /** Country */
+            country?: string | null;
+            /** Event Date */
+            event_date?: string | null;
+            /**
+             * Has Run
+             * @description False for a future race, which cannot be fetched yet
+             */
+            has_run: boolean;
+            /**
+             * Is Ingested
+             * @description Whether this race is already stored locally
+             */
+            is_ingested: boolean;
+            /**
+             * Session Id
+             * @description Local session id when already ingested
+             */
+            session_id?: number | null;
         };
         /** SeasonOut */
         SeasonOut: {
@@ -898,7 +1112,7 @@ export interface components {
             n_laps: number;
             /**
              * Pace S
-             * @description Fitted lap time at zero tyre age
+             * @description Fitted lap time at zero tyre age. Extrapolated: the fit starts after the tyre warm-up phase, so nothing at age zero was observed. Compare stints on the curve's median_pace_s instead, which is read at a fixed age.
              */
             pace_s: number;
             /**
@@ -1730,6 +1944,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeasonPaceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_schedule_api_v1_schedule__season__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                season: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_fetch_jobs_api_v1_fetch_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FetchJobOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_fetch_job_api_v1_fetch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FetchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FetchJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fetch_job_api_v1_fetch__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FetchJobOut"];
                 };
             };
             /** @description Validation Error */

@@ -138,7 +138,11 @@ class StintFitOut(BaseModel):
     stint: int
     compound: str | None = None
     n_laps: int
-    pace_s: float = Field(description="Fitted lap time at zero tyre age")
+    pace_s: float = Field(
+        description="Fitted lap time at zero tyre age. Extrapolated: the fit starts "
+        "after the tyre warm-up phase, so nothing at age zero was observed. Compare "
+        "stints on the curve's median_pace_s instead, which is read at a fixed age."
+    )
     degradation_s_per_lap: float = Field(
         description="Fitted slope. May be negative when the stint was too short to "
         "support an estimate; see is_physical."
@@ -168,7 +172,10 @@ class DegradationOut(BaseModel):
     degradation_iqr_s: float = Field(
         description="Interquartile spread: the honest width of the estimate"
     )
-    median_pace_s: float
+    median_pace_s: float = Field(
+        description="Median stint pace read at a fixed tyre age, not back-cast to "
+        "zero, so compounds that degrade at different rates stay comparable."
+    )
     max_stint_laps: int = Field(
         description="Longest observed stint. Predictions beyond this extrapolate."
     )
@@ -521,3 +528,80 @@ class SeasonPaceResponse(BaseModel):
     meta: Meta
     rounds: list[int]
     drivers: list[SeasonPaceRowOut]
+
+
+# --------------------------------------------------------------------------
+# fetching
+# --------------------------------------------------------------------------
+
+
+class ScheduledRaceOut(BaseModel):
+    """One round of a published calendar, with its local status.
+
+    Unlike every other model here, this describes a race that may not be in the
+    database — that is the point, since it is how a client finds something to fetch.
+    """
+
+    season: int
+    round: int
+    name: str
+    country: str | None = None
+    event_date: dt.date | None = None
+    has_run: bool = Field(
+        description="False for a future race, which cannot be fetched yet"
+    )
+    is_ingested: bool = Field(description="Whether this race is already stored locally")
+    session_id: int | None = Field(
+        default=None, description="Local session id when already ingested"
+    )
+
+
+class ScheduleResponse(BaseModel):
+    season: int
+    source: str = Field(
+        default="FastF1 event schedule",
+        description="The calendar comes from the archive, not the local database",
+    )
+    races: list[ScheduledRaceOut]
+
+
+class FetchJobOut(BaseModel):
+    """Progress of an on-demand fetch.
+
+    A fetch runs ingest, transform and analyse in turn, so `state` names the stage and
+    the job is only `complete` once the race is actually viewable.
+    """
+
+    id: str
+    year: int
+    round: int
+    kind: str
+    telemetry: bool
+    state: str = Field(
+        description="queued, ingesting, transforming, analysing, complete or failed"
+    )
+    detail: str = Field(description="Human-readable description of the current stage")
+    progress: float = Field(ge=0.0, le=1.0, description="Rough completion fraction")
+    session_id: int | None = Field(
+        default=None, description="Set once ingestion has written the session"
+    )
+    laps: int = 0
+    telemetry_samples: int = 0
+    warnings: list[str] = Field(
+        default_factory=list, description="Data-quality warnings raised during ingestion"
+    )
+    error: str | None = None
+    started_at: dt.datetime
+    finished_at: dt.datetime | None = None
+
+
+class FetchRequest(BaseModel):
+    """What to fetch. Race sessions are the default because they are what the engine analyses."""
+
+    year: int = Field(ge=1950, description="Season year")
+    round: int = Field(ge=1, description="Round number within the season")
+    kind: str = Field(default="R", description="FP1, FP2, FP3, Q, SQ, S or R")
+    telemetry: bool = Field(
+        default=True,
+        description="Telemetry roughly triples fetch time; false gives a timing-only load",
+    )

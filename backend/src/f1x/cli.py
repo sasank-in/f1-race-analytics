@@ -107,8 +107,8 @@ ingest_app = typer.Typer(help="Load and validate Formula 1 session data.", no_ar
 app.add_typer(ingest_app, name="ingest")
 
 
-def _ingest_one(year: int, round_number: int, kind: str, telemetry: bool) -> None:
-    """Load and persist one session, keeping CLI commands deliberately thin."""
+def _ingest_one(year: int, round_number: int, kind: str, telemetry: bool) -> int:
+    """Load and persist one session, returning its id. CLI commands stay thin."""
     from f1x.ingest import FastF1Client, SessionRequest
     from f1x.ingest.loader import SessionLoader
     from f1x.repo import create_session_factory
@@ -137,6 +137,7 @@ def _ingest_one(year: int, round_number: int, kind: str, telemetry: bool) -> Non
     console.print(table)
     for warning in summary.quality.warnings:
         console.print(f"[yellow]warning:[/] {warning}")
+    return summary.session_id
 
 
 @ingest_app.command("session")
@@ -145,13 +146,41 @@ def ingest_session(
     round_number: int = typer.Argument(..., min=1),
     kind: str = typer.Argument(..., help="FP1, FP2, FP3, Q, SQ, S, or R"),
     telemetry: bool = typer.Option(True, "--telemetry/--no-telemetry"),
+    analyse: bool = typer.Option(
+        False,
+        "--analyse",
+        help="Also transform and analyse, leaving the race ready to view",
+    ),
 ) -> None:
-    """Ingest one fully-loaded event session."""
+    """Ingest one fully-loaded event session.
+
+    Ingestion alone writes ``core`` rows that no page reads. Pass ``--analyse`` to run
+    transform and analyse as well, which is what the API's fetch endpoint does.
+    """
     try:
-        _ingest_one(year, round_number, kind.upper(), telemetry)
+        session_id = _ingest_one(year, round_number, kind.upper(), telemetry)
     except (ValueError, RuntimeError) as exc:
         console.print(f"[red]ingestion failed:[/] {exc}")
         raise typer.Exit(1) from exc
+
+    if not analyse:
+        console.print(
+            "[dim]Run `f1x transform session` and `f1x analyse session` to make this "
+            "race viewable, or re-run with --analyse.[/]"
+        )
+        return
+
+    from sqlalchemy import create_engine
+
+    from f1x.engine.repository import analyse_and_store
+
+    engine = create_engine(str(get_settings().database_url), pool_pre_ping=True)
+    try:
+        _transform_one(engine, session_id)
+        analyse_and_store(engine, session_id)
+    finally:
+        engine.dispose()
+    console.print(f"[green]session {session_id} ingested, transformed and analysed.[/]")
 
 
 @ingest_app.command("backfill")
@@ -178,6 +207,56 @@ def backfill(
     console.print(
         f"[green]backfill complete:[/] {year}, rounds {first_round}-{last_round}, {kind.upper()}"
     )
+
+
+@ingest_app.command("schedule")
+def ingest_schedule(
+    year: int = typer.Argument(..., min=1950, help="Season whose calendar to list"),
+) -> None:
+    """List a season's calendar, marking which rounds are already stored.
+
+    Reads the published calendar rather than the database, so this works for a season
+    that has never been ingested — it is how you find the round number to fetch.
+    """
+    from sqlalchemy import create_engine
+
+    from f1x.ingest.schedule import annotate_ingested, fetch_schedule
+
+    settings = get_settings()
+    try:
+        races = fetch_schedule(year, settings)
+    except Exception as exc:
+        console.print(f"[red]could not load the {year} calendar:[/] {exc}")
+        raise typer.Exit(1) from exc
+
+    engine = create_engine(str(settings.database_url), pool_pre_ping=True)
+    try:
+        races = annotate_ingested(races, engine)
+    finally:
+        engine.dispose()
+
+    table = Table("round", "race", "date", "status", title=f"{year} calendar")
+    for race in races:
+        if race.is_ingested:
+            status = "[green]ingested[/]"
+        elif not race.has_run:
+            status = "[dim]not yet run[/]"
+        else:
+            status = "[yellow]available[/]"
+        table.add_row(
+            str(race.round_number),
+            race.name,
+            race.event_date.isoformat() if race.event_date else "-",
+            status,
+        )
+    console.print(table)
+
+    available = sum(1 for r in races if r.has_run and not r.is_ingested)
+    if available:
+        console.print(
+            f"[yellow]{available} races available to fetch.[/] "
+            f"Load one with `f1x ingest session {year} <round> R`."
+        )
 
 
 @db_app.command("status")

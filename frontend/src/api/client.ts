@@ -36,6 +36,9 @@ export type SeasonProfileResponse = Schemas["SeasonProfileResponse"];
 export type CircuitProfile = Schemas["CircuitProfileOut"];
 export type SeasonPaceResponse = Schemas["SeasonPaceResponse"];
 export type SeasonPaceRow = Schemas["SeasonPaceRowOut"];
+export type ScheduleResponse = Schemas["ScheduleResponse"];
+export type ScheduledRace = Schemas["ScheduledRaceOut"];
+export type FetchJob = Schemas["FetchJobOut"];
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -50,11 +53,13 @@ export class ApiError extends Error {
   }
 }
 
-async function get<T>(path: string): Promise<T> {
+async function get<T>(path: string, revalidate = 60): Promise<T> {
   const response = await fetch(`${BASE}/api/v1${path}`, {
     // Analysis output only changes when the engine version does, so the browser may
-    // hold it briefly. The backend's Redis cache does the real work.
-    next: { revalidate: 60 },
+    // hold it briefly. The backend's Redis cache does the real work. Pass 0 for
+    // things that change under us — a running fetch, or a schedule whose ingested
+    // flags flip the moment one finishes.
+    ...(revalidate === 0 ? { cache: "no-store" as const } : { next: { revalidate } }),
   });
 
   if (!response.ok) {
@@ -64,6 +69,29 @@ async function get<T>(path: string): Promise<T> {
     try {
       const body = await response.json();
       if (typeof body?.detail === "string") detail = body.detail;
+    } catch {
+      // Non-JSON error body; the status-based message stands.
+    }
+    throw new ApiError(response.status, detail);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${BASE}/api/v1${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    // A fetch mutates the dataset, so it must never be served from a cache.
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const payload = await response.json();
+      if (typeof payload?.detail === "string") detail = payload.detail;
     } catch {
       // Non-JSON error body; the status-based message stands.
     }
@@ -105,6 +133,14 @@ export const api = {
   simulate: (id: number, iterations = 2000) =>
     get<SimulationResponse>(`/simulate/${id}?iterations=${iterations}`),
   ratings: (season: number) => get<RatingsResponse>(`/ratings/${season}`),
+  // Fetching. The schedule comes from the archive rather than the database, so it
+  // lists races that are not ingested yet — which is the point of it.
+  schedule: (season: number) => get<ScheduleResponse>(`/schedule/${season}`, 0),
+  startFetch: (year: number, round: number, kind = "R", telemetry = true) =>
+    post<FetchJob>("/fetch", { year, round, kind, telemetry }),
+  fetchJob: (jobId: string) => get<FetchJob>(`/fetch/${jobId}`, 0),
+  fetchJobs: () => get<FetchJob[]>("/fetch", 0),
+
   telemetry: (id: number, a: string, lapA: number, b: string, lapB: number) =>
     get<TelemetryCompareResponse>(
       `/telemetry/compare/${id}?driver_a=${a}&lap_a=${lapA}&driver_b=${b}&lap_b=${lapB}`,
