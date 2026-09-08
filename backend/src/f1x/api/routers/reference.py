@@ -104,17 +104,24 @@ def get_session(session_id: int) -> SessionOut:
 # would be 44 round trips to render one list.
 SUMMARY_QUERY = """
     WITH winner AS (
-        SELECT r.session_id, en.driver_number
+        SELECT r.session_id, en.driver_number, d.abbreviation
         FROM core.results r
         JOIN core.entries en
           ON en.session_id = r.session_id AND en.driver_id = r.driver_id
+        LEFT JOIN core.drivers d ON d.id = r.driver_id
         WHERE r.position = 1
     ),
     quickest AS (
-        SELECT DISTINCT ON (session_id) session_id, driver_number
-        FROM mart.pace_rankings
-        WHERE engine_version = :v
-        ORDER BY session_id, rank
+        SELECT DISTINCT ON (p.session_id)
+               p.session_id, p.driver_number, d.abbreviation
+        FROM mart.pace_rankings p
+        -- Left joins so a driver with no entry row still yields a headline, falling
+        -- back to the car number rather than dropping the race from the list.
+        LEFT JOIN core.entries en
+               ON en.session_id = p.session_id AND en.driver_number = p.driver_number
+        LEFT JOIN core.drivers d ON d.id = en.driver_id
+        WHERE p.engine_version = :v
+        ORDER BY p.session_id, p.rank
     ),
     retirements AS (
         SELECT session_id, count(*) AS n
@@ -134,7 +141,9 @@ SUMMARY_QUERY = """
     SELECT s.id AS session_id, e.name AS event_name, e.season_year, e.round,
            s.total_laps, s.telemetry_loaded,
            w.driver_number AS winner,
+           w.abbreviation AS winner_code,
            q.driver_number AS fastest_driver,
+           q.abbreviation AS fastest_code,
            coalesce(rt.n, 0) AS n_retirements,
            st.typical_stops AS optimal_stops
     FROM core.sessions s
@@ -161,21 +170,34 @@ def _headline(row: Mapping[str, Any]) -> str:
     retirements = int(row.get("n_retirements") or 0)
     stops: float | None = row.get("optimal_stops")
 
+    def name(code: str | None, number: str | None) -> str:
+        """Prefer the driver's code. "VER won" reads; "Car 1 won" has to be decoded."""
+        if code:
+            return str(code)
+        return f"car {number}"
+
+    win_name = name(row.get("winner_code"), winner)
+    fast_name = name(row.get("fastest_code"), fastest)
+
     parts: list[str] = []
     if winner and fastest and winner != fastest:
         # The interesting case, stated first: pace and result disagreed.
-        parts.append(f"Car {fastest} had the pace; car {winner} won")
+        parts.append(f"{fast_name} had the pace; {win_name} won")
     elif winner:
-        parts.append(f"Car {winner} won, and was quickest")
+        parts.append(f"{win_name} won, and was quickest")
     elif fastest:
-        parts.append(f"Car {fastest} was quickest")
+        parts.append(f"{fast_name} was quickest")
 
     if stops:
         parts.append(f"{int(stops)}-stop race")
     if retirements:
         parts.append(f"{retirements} retirement{'s' if retirements != 1 else ''}")
 
-    return ". ".join(parts) + "." if parts else "Not yet analysed."
+    if not parts:
+        return "Not yet analysed."
+    # The first clause opens the sentence, and the fallback ("car 1") is lowercase.
+    sentence = ". ".join(parts) + "."
+    return sentence[0].upper() + sentence[1:]
 
 
 @router.get("/summaries", response_model=list[SessionSummaryOut])

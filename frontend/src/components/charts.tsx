@@ -43,7 +43,7 @@ export function PaceChart({ data }: { data: PaceResponse }) {
         style={{ color: "var(--text-muted)", borderColor: "var(--border)" }}
       >
         <span className="w-5" />
-        <span className="w-8">car</span>
+        <span className="w-10">driver</span>
         <span className="flex-1">gap to fastest</span>
         <span className="w-16 text-right">gap</span>
         <span className="w-20 text-right">pace</span>
@@ -67,7 +67,10 @@ export function PaceChart({ data }: { data: PaceResponse }) {
             >
               {driver.rank}
             </span>
-            <span className="tnum w-8 font-medium">#{driver.driver_number}</span>
+            {/* The driver's code where it is known: "VER" is read, "#1" is decoded. */}
+            <span className="w-10 font-medium">
+              {driver.abbreviation ?? `#${driver.driver_number}`}
+            </span>
 
             <div className="relative flex-1">
               {driver.rank === 1 ? (

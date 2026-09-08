@@ -94,6 +94,9 @@ class LapOut(BaseModel):
 
 class PaceOut(BaseModel):
     driver_number: str
+    abbreviation: str | None = Field(
+        default=None, description="Three-letter driver code, when the entry is known"
+    )
     rank: int
     n_laps: int
 
@@ -512,6 +515,11 @@ class SeasonPaceRowOut(BaseModel):
     """One driver's pace across a season, race by race."""
 
     driver_number: str
+    abbreviation: str | None = Field(
+        default=None,
+        description="Three-letter driver code. A chart legend of numbers has to be "
+        "decoded; VER and PER can be read.",
+    )
     n_races: int
     mean_gap_s: float = Field(description="Mean gap to the quickest car, per race")
     best_gap_s: float

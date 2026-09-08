@@ -796,6 +796,11 @@ export interface components {
         PaceOut: {
             /** Driver Number */
             driver_number: string;
+            /**
+             * Abbreviation
+             * @description Three-letter driver code, when the entry is known
+             */
+            abbreviation?: string | null;
             /** Rank */
             rank: number;
             /** N Laps */
@@ -954,6 +959,11 @@ export interface components {
         SeasonPaceRowOut: {
             /** Driver Number */
             driver_number: string;
+            /**
+             * Abbreviation
+             * @description Three-letter driver code. A chart legend of numbers has to be decoded; VER and PER can be read.
+             */
+            abbreviation?: string | null;
             /** N Races */
             n_races: number;
             /**

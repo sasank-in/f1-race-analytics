@@ -130,10 +130,15 @@ def circuit_profiles(
 
 
 SEASON_PACE_QUERY = """
-    SELECT e.round, p.driver_number, p.gap_to_best_s, p.rank
+    SELECT e.round, p.driver_number, p.gap_to_best_s, p.rank, d.abbreviation
     FROM mart.pace_rankings p
     JOIN core.sessions s ON s.id = p.session_id
     JOIN core.events e ON e.id = s.event_id
+    -- Left joins: a driver whose entry row is missing still gets a line, unlabelled,
+    -- rather than vanishing from the season entirely.
+    LEFT JOIN core.entries en
+           ON en.session_id = p.session_id AND en.driver_number = p.driver_number
+    LEFT JOIN core.drivers d ON d.id = en.driver_id
     WHERE e.season_year = :season AND p.engine_version = :v
     ORDER BY e.round, p.rank
 """
@@ -168,9 +173,12 @@ def season_pace(season: int) -> SeasonPaceResponse:
     rounds = sorted({int(r["round"]) for r in rows})
     by_driver: dict[str, dict[int, float]] = {}
     wins: dict[str, int] = {}
+    abbreviations: dict[str, str] = {}
     for row in rows:
         driver = str(row["driver_number"])
         by_driver.setdefault(driver, {})[int(row["round"])] = float(row["gap_to_best_s"])
+        if row.get("abbreviation"):
+            abbreviations[driver] = str(row["abbreviation"])
         if int(row["rank"]) == 1:
             wins[driver] = wins.get(driver, 0) + 1
 
@@ -180,6 +188,7 @@ def season_pace(season: int) -> SeasonPaceResponse:
         drivers.append(
             SeasonPaceRowOut(
                 driver_number=driver,
+                abbreviation=abbreviations.get(driver),
                 n_races=len(values),
                 mean_gap_s=sum(values) / len(values),
                 best_gap_s=min(values),
