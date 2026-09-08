@@ -10,6 +10,7 @@
 import Link from "next/link";
 
 import { api, type SessionSummary } from "@/api/client";
+import { RaceList } from "@/components/race-list";
 import { Empty, ErrorNote } from "@/components/ui";
 
 export const revalidate = 60;
@@ -96,59 +97,8 @@ export default async function RacesPage() {
               </Link>
             </div>
 
-            <div
-              className="overflow-hidden rounded-lg border"
-              style={{ borderColor: "var(--border)" }}
-            >
-              {seasonRaces.map((race, index) => (
-                <Link
-                  key={race.session_id}
-                  href={`/sessions/${race.session_id}`}
-                  className="flex items-baseline gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--surface-2)]"
-                  style={{
-                    background: "var(--surface-1)",
-                    borderTop: index > 0 ? "1px solid var(--border)" : undefined,
-                  }}
-                >
-                  <span
-                    className="tnum w-6 shrink-0 text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    {race.round}
-                  </span>
-                  <span className="w-44 shrink-0 truncate text-sm font-medium">
-                    {race.event_name.replace(" Grand Prix", "")}
-                  </span>
+            <RaceList races={seasonRaces} />
 
-                  {/* The headline is the reason to click. */}
-                  <span
-                    className="flex-1 truncate text-xs"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    {race.headline}
-                  </span>
-
-                  {race.pace_winner_mismatch && (
-                    <span
-                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px]"
-                      style={{ background: "var(--surface-2)", color: "var(--series-2)" }}
-                      title="The quickest car did not win — worth a look"
-                    >
-                      upset
-                    </span>
-                  )}
-                  {race.telemetry_loaded && (
-                    <span
-                      className="shrink-0 text-[10px]"
-                      style={{ color: "var(--good)" }}
-                      title="Telemetry loaded: corner and track-map analysis available"
-                    >
-                      telemetry
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
           </section>
         ))}
     </div>

@@ -17,6 +17,9 @@ import Link from "next/link";
 import { api, type FetchJob, type ScheduledRace } from "@/api/client";
 import { Card, ErrorNote } from "@/components/ui";
 
+/** Which rounds the calendar is showing. */
+type CalendarFilter = "all" | "available" | "loaded";
+
 /** How often to poll a running job. Fast enough to feel live, slow enough to be cheap. */
 const POLL_MS = 2000;
 
@@ -49,6 +52,9 @@ export default function FetchPage() {
   const [telemetry, setTelemetry] = useState(true);
   const [job, setJob] = useState<FetchJob | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
+  // A calendar is 22-24 rounds and most of them are usually already loaded, so the
+  // useful default is "what can I still fetch" rather than the whole list.
+  const [filter, setFilter] = useState<CalendarFilter>("all");
 
   // Held in a ref so the poll effect can clear a timer it did not create.
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,6 +115,20 @@ export default function FetchPage() {
   };
 
   const running = job !== null && job.state !== "complete" && job.state !== "failed";
+
+  // A round that has not run yet counts as neither available nor loaded: there is
+  // nothing to fetch and nothing stored, so it only appears under "all".
+  const all = races ?? [];
+  const counts = {
+    all: all.length,
+    available: all.filter((r) => r.has_run && !r.is_ingested).length,
+    loaded: all.filter((r) => r.is_ingested).length,
+  };
+  const shown = all.filter((race) => {
+    if (filter === "available") return race.has_run && !race.is_ingested;
+    if (filter === "loaded") return race.is_ingested;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -186,6 +206,36 @@ export default function FetchPage() {
           </p>
         ) : (
           <>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", `all ${counts.all}`],
+                  ["available", `available to fetch ${counts.available}`],
+                  ["loaded", `already loaded ${counts.loaded}`],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  aria-pressed={filter === value}
+                  className="rounded border px-2.5 py-1 text-xs transition-colors"
+                  style={{
+                    borderColor:
+                      filter === value ? "var(--text-primary)" : "var(--border)",
+                    background:
+                      filter === value ? "var(--surface-2)" : "var(--surface-1)",
+                    color:
+                      filter === value
+                        ? "var(--text-primary)"
+                        : "var(--text-secondary)",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {/* Column headers above the rows, not below. */}
             <div
               className="mb-2 flex items-center gap-3 border-b pb-1.5 text-xs"
@@ -197,16 +247,24 @@ export default function FetchPage() {
               <span className="w-28 text-right">status</span>
             </div>
 
-            <div className="space-y-1">
-              {(races ?? []).map((race) => (
-                <ScheduleRow
-                  key={race.round}
-                  race={race}
-                  disabled={running}
-                  onFetch={() => start(race)}
-                />
-              ))}
-            </div>
+            {shown.length === 0 ? (
+              <p className="py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                {filter === "available"
+                  ? "Every round of this season that has run is already loaded."
+                  : "Nothing loaded from this season yet."}
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {shown.map((race) => (
+                  <ScheduleRow
+                    key={race.round}
+                    race={race}
+                    disabled={running}
+                    onFetch={() => start(race)}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
       </Card>
