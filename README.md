@@ -36,6 +36,12 @@ failures are recorded alongside the successes.
 Leclerc **P3 on pace, DNF**. Norris **P4 on pace, finished P17**. The disagreement is
 the analysis.
 
+![Race pace at Bahrain 2023, ranked on fuel-corrected laps with the finishing result
+beside it](docs/images/race-pace.png)
+
+The result column is the point. Ranking by pace and ranking by finish are different
+questions, and the rows where they disagree are the ones worth opening.
+
 **Circuits by tyre demand.** Sakhir degrades at 0.143 s/lap and stints last 19 laps;
 Spielberg at 0.072 and stints last 29. Nothing enforces that relationship — it emerges.
 
@@ -45,6 +51,21 @@ MEDIUM 0.055 > HARD 0.048 s/lap. Again unenforced, and the correct physical orde
 **Track geometry.** Lap distance integrated from speed alone lands within 0.9–2.2 % of
 the true length across eight circuits, erring consistently short — the signature of
 trapezoidal integration, not noise.
+
+**A season's shape.** Gap to the quickest car, round by round. Verstappen pinned on the
+baseline all year; Norris climbing from +1.5 s to the front as McLaren's mid-season
+upgrade lands; Pérez drifting away after round 13. Smoothed over three races, because
+the race-to-race swing is 0.3–0.6 s for most drivers and circuit character otherwise
+buries the trend.
+
+![Pace through the 2023 season, one line per driver, gap to the quickest car by
+round](docs/images/season-pace.png)
+
+**Finding a race worth opening.** Every round carries a one-line summary, and the ones
+where the quickest car did not win are tagged.
+
+![The race index, each round summarised in one line with upsets
+tagged](docs/images/races.png)
 
 
 ## Dataset
@@ -62,7 +83,7 @@ and the engine needs laps.
 | Position samples | 16.6 M |
 | API endpoints | 22, plus `/health` |
 | UI pages | 8 |
-| Tests | 282 |
+| Tests | 290 |
 
 
 ## Architecture
