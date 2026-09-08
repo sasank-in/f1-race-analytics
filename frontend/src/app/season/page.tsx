@@ -79,7 +79,7 @@ export default async function SeasonPage({
       <Card
         title="Pace through the season"
         subtitle={`Gap to the quickest car, round by round, ${season}`}
-        caveat="A line that falls is a car getting closer to the front. Missing points are races the driver did not complete."
+        caveat="Zero is the quickest car that weekend, so a line near the baseline is a car at the front and a line climbing is one falling away. Gaps in a line are races the driver did not complete. Click a driver to isolate them, or switch to per-race to see every result unsmoothed."
       >
         {isError(pace) ? (
           <ErrorNote detail={pace.error} />
