@@ -613,3 +613,59 @@ class FetchRequest(BaseModel):
         default=True,
         description="Telemetry roughly triples fetch time; false gives a timing-only load",
     )
+
+
+# --------------------------------------------------------------------------
+# race insights
+# --------------------------------------------------------------------------
+
+
+class PodiumEntryOut(BaseModel):
+    """One classified finisher, with what the engine thought of their pace."""
+
+    position: int
+    driver_number: str
+    abbreviation: str | None = None
+    team: str | None = None
+    status: str | None = None
+    pace_rank: int | None = Field(
+        default=None, description="Where the engine ranked them on corrected pace"
+    )
+    gap_to_best_s: float | None = None
+
+
+class InsightOut(BaseModel):
+    """One finding about a race, stated so it can be checked.
+
+    Each carries the number it was derived from rather than only a sentence, so a
+    reader can disagree with the figure instead of only with the wording.
+    """
+
+    kind: str = Field(
+        description="Machine-readable tag: upset, dominance, degradation, "
+        "strategy, attrition, teammate or close_field"
+    )
+    headline: str = Field(description="The finding in one sentence")
+    detail: str | None = Field(
+        default=None, description="What supports it, including the caveat where one applies"
+    )
+    magnitude: float | None = Field(
+        default=None, description="The number behind it, in the unit named by the headline"
+    )
+
+
+class RaceInsightsResponse(BaseModel):
+    """Winner, podium and the notable findings for one race."""
+
+    session_id: int
+    meta: Meta
+    winner: PodiumEntryOut | None = None
+    fastest_on_pace: PodiumEntryOut | None = Field(
+        default=None, description="Quickest on corrected pace, who may not have won"
+    )
+    podium: list[PodiumEntryOut] = Field(
+        default_factory=list, description="Top three classified finishers"
+    )
+    insights: list[InsightOut] = Field(
+        default_factory=list, description="Most notable first"
+    )

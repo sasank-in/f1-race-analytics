@@ -16,7 +16,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from f1x.api.deps import get_cache, get_engine
-from f1x.api.routers import analysis, fetch, reference, season, strategy, telemetry
+from f1x.api.routers import (
+    analysis,
+    fetch,
+    insights,
+    reference,
+    season,
+    strategy,
+    telemetry,
+)
 from f1x.config import ENGINE_VERSION, get_settings
 
 logger = logging.getLogger(__name__)
@@ -79,6 +87,7 @@ def create_app() -> FastAPI:
     api = "/api/v1"
     app.include_router(reference.router, prefix=api)
     app.include_router(analysis.router, prefix=api)
+    app.include_router(insights.router, prefix=api)
     app.include_router(strategy.router, prefix=api)
     app.include_router(telemetry.router, prefix=api)
     app.include_router(season.router, prefix=api)
