@@ -14,6 +14,7 @@ import Link from "next/link";
 
 import { api, formatLapTime, type Session } from "@/api/client";
 import { DegradationChart, PaceChart } from "@/components/charts";
+import { PositionChart } from "@/components/position-chart";
 import { Card, CompoundTag, Empty, ErrorNote, Stat } from "@/components/ui";
 
 export const revalidate = 60;
@@ -49,12 +50,22 @@ export default async function SessionPage({
     );
   }
 
-  const [pace, degradation, strategy, simulation] = await Promise.all([
+  const [pace, degradation, strategy, simulation, insights, laps] = await Promise.all([
     attempt(() => api.pace(sessionId)),
     attempt(() => api.degradation(sessionId)),
     attempt(() => api.strategy(sessionId)),
     attempt(() => api.simulate(sessionId, 2000)),
+    attempt(() => api.insights(sessionId)),
+    attempt(() => api.laps(sessionId)),
   ]);
+
+  // Driver codes for the position chart, which reads laps rather than the ranking.
+  const codes = new Map<string, string>();
+  if (!isError(pace)) {
+    for (const driver of pace.drivers) {
+      if (driver.abbreviation) codes.set(driver.driver_number, driver.abbreviation);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -105,6 +116,63 @@ export default async function SessionPage({
         </nav>
       </div>
 
+      {/* Result first. A reader arriving at a race wants to know who won before
+          being shown a pace model that disagrees with it. */}
+      {!isError(insights) && insights.winner && (
+        <Card
+          title="Result"
+          subtitle="Podium, and what the engine made of the race"
+        >
+          <div className="flex flex-wrap gap-6">
+            {(insights.podium ?? []).map((entry) => (
+              <div key={entry.driver_number} className="min-w-32">
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="tnum text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    P{entry.position}
+                  </span>
+                  <span className="text-sm font-semibold">
+                    {entry.abbreviation ?? `#${entry.driver_number}`}
+                  </span>
+                </div>
+                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  {entry.team ?? "—"}
+                </p>
+                {entry.pace_rank != null && (
+                  <p
+                    className="mt-0.5 text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                    title="Where the engine ranked this car on fuel-corrected pace"
+                  >
+                    P{entry.pace_rank} on pace
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {(insights.insights?.length ?? 0) > 0 && (
+            <ul className="mt-5 space-y-2.5 border-t pt-4" style={{ borderColor: "var(--border)" }}>
+              {(insights.insights ?? []).map((item) => (
+                <li key={item.headline}>
+                  <p className="text-sm font-medium">{item.headline}</p>
+                  {item.detail && (
+                    <p
+                      className="mt-0.5 text-xs"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {item.detail}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
       <Card
         title="Race pace"
         subtitle="20th percentile of clean fuel-corrected laps, ranked"
@@ -118,6 +186,18 @@ export default async function SessionPage({
           <PaceChart data={pace} />
         )}
       </Card>
+
+      {/* What actually happened to the order, as against what the pace model says
+          should have. The two disagreeing is the interesting case. */}
+      {!isError(laps) && laps.some((lap) => lap.position != null) && (
+        <Card
+          title="Race position"
+          subtitle="Position on the road, lap by lap"
+          caveat="A pit stop shows as a drop and recovery, not as lost places on track. Click a driver to isolate them."
+        >
+          <PositionChart laps={laps} codes={codes} />
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card

@@ -175,6 +175,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/insights/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insights
+         * @description Who won, who was quickest, and what was notable about the race.
+         */
+        get: operations["get_insights_api_v1_insights__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/strategy/{session_id}": {
         parameters: {
             query?: never;
@@ -744,6 +764,35 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * InsightOut
+         * @description One finding about a race, stated so it can be checked.
+         *
+         *     Each carries the number it was derived from rather than only a sentence, so a
+         *     reader can disagree with the figure instead of only with the wording.
+         */
+        InsightOut: {
+            /**
+             * Kind
+             * @description Machine-readable tag: upset, dominance, degradation, strategy, attrition, teammate or close_field
+             */
+            kind: string;
+            /**
+             * Headline
+             * @description The finding in one sentence
+             */
+            headline: string;
+            /**
+             * Detail
+             * @description What supports it, including the caveat where one applies
+             */
+            detail?: string | null;
+            /**
+             * Magnitude
+             * @description The number behind it, in the unit named by the headline
+             */
+            magnitude?: number | null;
+        };
         /** LapOut */
         LapOut: {
             /** Driver Number */
@@ -868,6 +917,51 @@ export interface components {
             net_loss_s: number;
             /** Spread S */
             spread_s: number;
+        };
+        /**
+         * PodiumEntryOut
+         * @description One classified finisher, with what the engine thought of their pace.
+         */
+        PodiumEntryOut: {
+            /** Position */
+            position: number;
+            /** Driver Number */
+            driver_number: string;
+            /** Abbreviation */
+            abbreviation?: string | null;
+            /** Team */
+            team?: string | null;
+            /** Status */
+            status?: string | null;
+            /**
+             * Pace Rank
+             * @description Where the engine ranked them on corrected pace
+             */
+            pace_rank?: number | null;
+            /** Gap To Best S */
+            gap_to_best_s?: number | null;
+        };
+        /**
+         * RaceInsightsResponse
+         * @description Winner, podium and the notable findings for one race.
+         */
+        RaceInsightsResponse: {
+            /** Session Id */
+            session_id: number;
+            meta: components["schemas"]["Meta"];
+            winner?: components["schemas"]["PodiumEntryOut"] | null;
+            /** @description Quickest on corrected pace, who may not have won */
+            fastest_on_pace?: components["schemas"]["PodiumEntryOut"] | null;
+            /**
+             * Podium
+             * @description Top three classified finishers
+             */
+            podium?: components["schemas"]["PodiumEntryOut"][];
+            /**
+             * Insights
+             * @description Most notable first
+             */
+            insights?: components["schemas"]["InsightOut"][];
         };
         /** RatingsResponse */
         RatingsResponse: {
@@ -1631,6 +1725,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DegradationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insights_api_v1_insights__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RaceInsightsResponse"];
                 };
             };
             /** @description Validation Error */

@@ -39,6 +39,9 @@ export type SeasonPaceRow = Schemas["SeasonPaceRowOut"];
 export type ScheduleResponse = Schemas["ScheduleResponse"];
 export type ScheduledRace = Schemas["ScheduledRaceOut"];
 export type FetchJob = Schemas["FetchJobOut"];
+export type RaceInsights = Schemas["RaceInsightsResponse"];
+export type Insight = Schemas["InsightOut"];
+export type PodiumEntry = Schemas["PodiumEntryOut"];
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -118,6 +121,7 @@ export const api = {
   pace: (id: number) => get<PaceResponse>(`/analysis/pace/${id}`),
   degradation: (id: number) => get<DegradationResponse>(`/analysis/degradation/${id}`),
 
+  insights: (id: number) => get<RaceInsights>(`/insights/${id}`),
   strategy: (id: number) => get<StrategyResponse>(`/strategy/${id}`),
   undercut: (id: number, maxGap = 3) =>
     get<UndercutResponse>(`/undercut/${id}?max_gap_s=${maxGap}`),
