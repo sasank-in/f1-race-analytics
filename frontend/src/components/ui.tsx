@@ -148,23 +148,3 @@ export function CompoundTag({ compound }: { compound: string | null | undefined 
 }
 
 /** Legend for a multi-series chart. Always present when more than one series shows. */
-export function Legend({
-  items,
-}: {
-  items: { label: string; color: string }[];
-}) {
-  return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
-      {items.map((item) => (
-        <li key={item.label} className="flex items-center gap-1.5 text-xs">
-          <span
-            aria-hidden
-            className="inline-block h-2.5 w-2.5 rounded-sm"
-            style={{ background: item.color }}
-          />
-          <span style={{ color: "var(--text-secondary)" }}>{item.label}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}

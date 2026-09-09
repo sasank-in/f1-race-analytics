@@ -19,7 +19,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-import polars as pl
 
 from f1x.engine.predictive.features import FeatureSet
 
@@ -194,8 +193,3 @@ def feature_importance(
         zip(columns, (float(c) for c in coefficients), strict=True),
         key=lambda pair: -abs(pair[1]),
     )
-
-
-def build_results_frame(rows: list[dict[str, object]]) -> pl.DataFrame:
-    """Assemble the raw result rows the feature store expects."""
-    return pl.DataFrame(rows) if rows else pl.DataFrame()

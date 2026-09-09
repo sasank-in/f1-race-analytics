@@ -4,7 +4,7 @@
 
 An advanced motorsport analytics platform. It ingests official F1 timing, telemetry and
 positional data, normalises it into a time-series warehouse, and runs a layered analysis
-engine that produces pace, degradation, strategy, telemetry and predictive insight —
+engine that produces pace, degradation, strategy, telemetry and simulation output —
 served through a typed API into an interactive UI.
 
 The target is *analyst-grade* output: fuel-corrected pace, tyre degradation curves,
@@ -85,7 +85,8 @@ f1-race/
 │       │   ├── strategy/       pit loss, undercut/overcut, optimal stops
 │       │   ├── telemetry/      delta-time, corner detection, line comparison
 │       │   ├── simulation/     Monte Carlo race + championship sim
-│       │   ├── predictive/     quali/race outcome models, feature store
+│       │   ├── predictive/     outcome model and feature store (library only,
+│       │   │                    not exposed — see docs/models-and-training.md)
 │       │   └── metrics/        composite ratings, driver/team scorecards
 │       ├── api/                FastAPI routers, deps, caching, errors
 │       └── jobs/               scheduled refresh + materialisation tasks
