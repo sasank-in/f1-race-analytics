@@ -1,5 +1,12 @@
 """Race outcome prediction, with the baseline that has to be beaten.
 
+**Not exposed.** No CLI command or API endpoint calls this module. It is kept as a
+library, and as a recorded negative result, because ``beats_baseline`` below does not
+reliably reject a useless model: on randomly generated finishing orders it declares the
+model better than the baseline in roughly half of trials, since both rank correlations
+sit near zero and whichever lands higher is a coin toss. Measurements, and the
+permutation test that would fix it, are in ``docs/models-and-training.md``.
+
 Any model of finishing position is competing against a very strong trivial answer:
 *predict that everyone finishes where they started*. Grid position alone explains most
 of the variance in a modern Formula 1 race, and a model that cannot beat it has learned

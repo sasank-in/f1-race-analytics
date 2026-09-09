@@ -45,7 +45,7 @@ simulation — not lap-time line charts.
                           └──────────────────┬───────────────────┘
                                              ▼
                           ┌──────────────────────────────────────┐
-                          │  Next.js 15 UI (App Router, ECharts) │
+                          │  Next.js 16 UI (App Router, SVG)     │
                           └──────────────────────────────────────┘
 ```
 
@@ -89,9 +89,8 @@ f1-race/
 │       │   │                    not exposed — see docs/models-and-training.md)
 │       │   └── metrics/        composite ratings, driver/team scorecards
 │       ├── api/                FastAPI routers, deps, caching, errors
-│       └── jobs/               scheduled refresh + materialisation tasks
-├── frontend/                   Next.js 15 + TS + Tailwind + ECharts
-├── notebooks/                  exploration & model validation
+│       └── jobs/               empty: scheduled refresh is Phase 11, not built
+├── frontend/                   Next.js 16 + TS + Tailwind, charts hand-drawn as SVG
 └── tests/                      unit (fixtures), integration (testcontainers)
 ```
 
