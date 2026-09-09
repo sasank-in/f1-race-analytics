@@ -158,11 +158,32 @@ export function DegradationChart({ data }: { data: DegradationResponse }) {
       {compounds.map((compound) => {
         const centre = (compound.degradation_s_per_lap / maxValue) * 100;
         const halfSpread = (compound.degradation_iqr_s / 2 / maxValue) * 100;
+        // A negative slope is not a gentle compound: it means the stints were too
+        // short to clear tyre warm-up, so the fit failed. Drawn as a stub bar it is
+        // indistinguishable from a real low-degradation figure, which is worse than
+        // showing nothing — so it is marked rather than quietly rendered.
+        const unphysical = compound.degradation_s_per_lap < 0;
         return (
           <div key={compound.compound} className="text-xs">
             <div className="mb-1 flex items-baseline justify-between">
-              <span className="font-medium">{compound.compound}</span>
-              <span className="tnum" style={{ color: "var(--text-secondary)" }}>
+              <span className="font-medium">
+                {compound.compound}
+                {unphysical && (
+                  <span
+                    className="ml-2 rounded px-1 py-0.5 text-[10px] font-normal"
+                    style={{ background: "var(--surface-2)", color: "var(--critical)" }}
+                    title="A negative slope means the stints were too short to support an estimate. Tyres do not gain time with age."
+                  >
+                    no usable fit
+                  </span>
+                )}
+              </span>
+              <span
+                className="tnum"
+                style={{
+                  color: unphysical ? "var(--critical)" : "var(--text-secondary)",
+                }}
+              >
                 {compound.degradation_s_per_lap >= 0 ? "+" : ""}
                 {compound.degradation_s_per_lap.toFixed(3)} s/lap
               </span>
@@ -175,7 +196,11 @@ export function DegradationChart({ data }: { data: DegradationResponse }) {
                 className="absolute h-4 rounded-r"
                 style={{
                   width: `${Math.max(centre, 0.8)}%`,
-                  background: compoundColor(compound.compound),
+                  // Hatched rather than solid: the bar still shows the magnitude, but
+                  // stops reading as a measurement.
+                  background: unphysical
+                    ? "repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 3px, var(--border-strong) 3px, var(--border-strong) 6px)"
+                    : compoundColor(compound.compound),
                   boxShadow: "0 0 0 1px var(--border-strong)",
                 }}
               />
