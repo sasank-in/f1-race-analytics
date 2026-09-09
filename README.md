@@ -27,6 +27,8 @@ failures are recorded alongside the successes.
 | **Strategy** | Pit-loss estimation, optimal stop count, undercut and overcut windows lap by lap |
 | **Telemetry** | Distance-aligned lap comparison, cumulative delta, corner detection, track maps drawn from GPS |
 | **Simulation** | Monte Carlo race outcomes, championship projection |
+| **Result** | Winner and podium with each car's pace rank beside it, plus the findings that make a race worth opening |
+| **Position** | Where every car ran, lap by lap, with stops and retirements visible |
 | **Season** | Circuits ranked by tyre demand, pace curves through a calendar |
 | **Drivers** | Teammate head-to-head, composite ratings across four components |
 
@@ -81,9 +83,9 @@ and the engine needs laps.
 | Laps | 47,997 |
 | Telemetry samples | 16.2 M |
 | Position samples | 16.6 M |
-| API endpoints | 22, plus `/health` |
+| API endpoints | 23, plus `/health` |
 | UI pages | 8 |
-| Tests | 290 |
+| Tests | 307 |
 
 
 ## Architecture
@@ -199,7 +201,7 @@ lists its options.
 
 ## API
 
-Twenty-two endpoints under `/api/v1`, plus `/health`, which reports database
+Twenty-three endpoints under `/api/v1`, plus `/health`, which reports database
 reachability and the engine version. Interactive documentation is at `/docs` once the
 service is running.
 
@@ -214,6 +216,7 @@ changes what is stored, and it only ever adds or replaces a race.
 | `GET /analysis/laps/{id}` | Laps, optionally representative only |
 | `GET /analysis/pace/{id}` | Fuel-corrected pace ranking with finishing result |
 | `GET /analysis/degradation/{id}` | Compound degradation curves |
+| `GET /insights/{id}` | Winner, podium, and what was notable about the race |
 | `GET /strategy/{id}` | Pit loss and optimal stop count |
 | `GET /undercut/{id}` | Undercut and overcut windows, lap by lap |
 | `GET /stints/{id}` | Stint timeline |
