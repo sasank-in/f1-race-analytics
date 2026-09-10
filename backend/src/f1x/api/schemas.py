@@ -253,6 +253,9 @@ class StintOut(BaseModel):
     """One run on a set of tyres, for the timeline."""
 
     driver_number: str
+    abbreviation: str | None = Field(
+        default=None, description="Three-letter driver code, when the entry is known"
+    )
     stint: int
     compound: str | None = None
     start_lap: int

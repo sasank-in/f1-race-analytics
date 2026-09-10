@@ -40,6 +40,12 @@ export default function TelemetryPage({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Driver codes from the pace ranking this page already loads. "VER" is read;
+  // "#1" has to be decoded, and every other page now shows the code.
+  const codeFor = (number: string) =>
+    pace?.drivers.find((d) => d.driver_number === number)?.abbreviation ??
+    `#${number}`;
+
   // Seed the selectors from the pace ranking, so the default comparison is the two
   // quickest cars rather than whichever numbers sort first.
   useEffect(() => {
@@ -114,7 +120,7 @@ export default function TelemetryPage({
           >
             {drivers.map((d) => (
               <option key={d.driver_number} value={d.driver_number}>
-                #{d.driver_number} (P{d.rank})
+                {d.abbreviation ?? `#${d.driver_number}`} (P{d.rank})
               </option>
             ))}
           </select>
@@ -132,7 +138,7 @@ export default function TelemetryPage({
           >
             {drivers.map((d) => (
               <option key={d.driver_number} value={d.driver_number}>
-                #{d.driver_number} (P{d.rank})
+                {d.abbreviation ?? `#${d.driver_number}`} (P{d.rank})
               </option>
             ))}
           </select>
@@ -164,7 +170,7 @@ export default function TelemetryPage({
       {map && (
         <Card
           title="Track map"
-          subtitle={`Car ${map.driver_number}, lap ${map.lap_number}, coloured by speed`}
+          subtitle={`${codeFor(map.driver_number)}, lap ${map.lap_number}, coloured by speed`}
           caveat="The circuit is drawn from the positional trace, not a stored map, so any layout with data renders. Numbered markers are the detected corners."
         >
           <TrackMap data={map} />
@@ -218,8 +224,12 @@ export default function TelemetryPage({
                 >
                   <span className="w-6">turn</span>
                   <span className="w-16 text-right">apex</span>
-                  <span className="w-14 text-right">#{result.reference_driver}</span>
-                  <span className="w-14 text-right">#{result.comparison_driver}</span>
+                  <span className="w-14 text-right">
+                    {codeFor(result.reference_driver)}
+                  </span>
+                  <span className="w-14 text-right">
+                    {codeFor(result.comparison_driver)}
+                  </span>
                   <span className="flex-1 text-center">
                     km/h difference at the apex
                   </span>

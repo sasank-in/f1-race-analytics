@@ -1251,6 +1251,11 @@ export interface components {
         StintOut: {
             /** Driver Number */
             driver_number: string;
+            /**
+             * Abbreviation
+             * @description Three-letter driver code, when the entry is known
+             */
+            abbreviation?: string | null;
             /** Stint */
             stint: number;
             /** Compound */

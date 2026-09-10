@@ -30,8 +30,12 @@ export function StintTimeline({
   const [hovered, setHovered] = useState<string | null>(null);
   if (stints.length === 0 || !totalLaps) return null;
 
+  // Driver codes travel on the stints themselves, so the timeline reads the same
+  // way as every other view rather than falling back to car numbers.
+  const codes = new Map<string, string>();
   const byDriver = new Map<string, Stint[]>();
   for (const stint of stints) {
+    if (stint.abbreviation) codes.set(stint.driver_number, stint.abbreviation);
     const list = byDriver.get(stint.driver_number) ?? [];
     list.push(stint);
     byDriver.set(stint.driver_number, list);
@@ -53,7 +57,9 @@ export function StintTimeline({
             onMouseEnter={() => setHovered(driver)}
             onMouseLeave={() => setHovered(null)}
           >
-            <span className="tnum w-8 shrink-0 text-xs font-medium">#{driver}</span>
+            <span className="w-10 shrink-0 text-xs font-medium">
+              {codes.get(driver) ?? `#${driver}`}
+            </span>
             <div className="relative flex h-5 min-w-0 flex-1 gap-[2px] overflow-hidden">
               {driverStints.map((stint) => {
                 const width = (stint.n_laps / totalLaps) * 100;
@@ -74,7 +80,7 @@ export function StintTimeline({
                           ? "#0b0b0b"
                           : "#ffffff",
                     }}
-                    title={`#${driver} stint ${stint.stint}: laps ${stint.start_lap}–${stint.end_lap} on ${stint.compound ?? "unknown"}${
+                    title={`${codes.get(driver) ?? `#${driver}`} stint ${stint.stint}: laps ${stint.start_lap}–${stint.end_lap} on ${stint.compound ?? "unknown"}${
                       stint.tyre_age_start
                         ? `, started at ${stint.tyre_age_start} laps of age`
                         : ""

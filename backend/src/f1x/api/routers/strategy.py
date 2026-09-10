@@ -213,10 +213,16 @@ def get_stints(session_id: int) -> StintTimelineResponse:
         ).scalar_one_or_none()
         rows = conn.execute(
             text(
-                "SELECT driver_number, stint, compound::text AS compound, start_lap, "
-                "       end_lap, n_laps, tyre_age_start, fresh_tyre "
-                "FROM core.stints WHERE session_id = :s "
-                "ORDER BY driver_number, stint"
+                "SELECT st.driver_number, d.abbreviation, st.stint, "
+                "       st.compound::text AS compound, st.start_lap, "
+                "       st.end_lap, st.n_laps, st.tyre_age_start, st.fresh_tyre "
+                "FROM core.stints st "
+                "LEFT JOIN core.entries en "
+                "  ON en.session_id = st.session_id "
+                " AND en.driver_number = st.driver_number "
+                "LEFT JOIN core.drivers d ON d.id = en.driver_id "
+                "WHERE st.session_id = :s "
+                "ORDER BY st.driver_number, st.stint"
             ),
             {"s": session_id},
         ).mappings()
