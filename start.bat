@@ -58,10 +58,13 @@ if errorlevel 1 (
 
 rem --- free the ports --------------------------------------------------------
 rem A previous run left running will hold these. Worse, a stale Next.js server
-rem serves an old build whose CSS hash no longer exists, so the page renders
-rem completely unstyled - a confusing failure worth preventing outright.
+rem serves an old build: the CSS hash no longer exists so the page renders
+rem unstyled, and routes added since that build return 404 even though the files
+rem are present. Both are confusing enough to be worth preventing outright.
 call :free_port %API_PORT% "API"
+if errorlevel 1 exit /b 1
 call :free_port %UI_PORT% "UI"
+if errorlevel 1 exit /b 1
 
 rem --- database and cache ----------------------------------------------------
 echo   [1/4] Starting database and cache...
@@ -130,9 +133,12 @@ if /i "%~1"=="--prod" (
     popd
 )
 
+rem Probe a nested route, not "/". The root answers from any Next.js server that
+rem ever ran here, including a stale one; a sub-route only resolves if the build
+rem being served actually contains it.
 set /a tries=0
 :wait_ui
-curl -s -o nul http://127.0.0.1:%UI_PORT% 2>nul
+curl -s -o nul -f http://127.0.0.1:%UI_PORT%/fetch 2>nul
 if not errorlevel 1 goto :ui_ready
 set /a tries+=1
 if !tries! GEQ 60 (
@@ -178,13 +184,44 @@ rem ===========================================================================
 
 :free_port
 rem Kill whatever holds a port, so a stale process cannot serve a stale build.
+rem
+rem Confirming the port actually frees matters more than it looks. A survivor here
+rem is invisible later: the readiness check below would get a healthy answer from
+rem the OLD server, and the script would report success while serving a build that
+rem predates whatever you just changed. That is exactly how routes appear to 404
+rem when the files are present and correct.
 set "PORT=%~1"
 set "LABEL=%~2"
+rem netstat lists a dual-stack listener once per address family, so the same PID
+rem appears twice. Announce each one only the first time it is seen, or stopping
+rem one server reads as stopping two.
+set "SEEN=|"
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r /c:":%PORT% .*LISTENING"') do (
     if not "%%p"=="0" (
-        echo   [-] Stopping the previous %LABEL% on port %PORT% ^(pid %%p^)
-        taskkill /F /PID %%p >nul 2>&1
+        rem Substring test rather than a piped findstr: a pipe inside a for block
+        rem is parsed before the block expands and breaks the loop.
+        set "PROBE=!SEEN:|%%p|=!"
+        if "!PROBE!"=="!SEEN!" (
+            set "SEEN=!SEEN!%%p|"
+            echo   [-] Stopping the previous %LABEL% on port %PORT% ^(pid %%p^)
+            taskkill /F /PID %%p >nul 2>&1
+        )
     )
+)
+
+rem Windows holds a socket briefly after the process dies, so give it a moment.
+ping -n 3 127.0.0.1 >nul 2>&1
+
+netstat -ano | findstr /r /c:":%PORT% .*LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    echo.
+    echo   [!] Port %PORT% is still held after taskkill.
+    echo       Something is running it that this script cannot stop — often a
+    echo       server started from another terminal, or one owned by a different
+    echo       user. Close it, or run:  netstat -ano ^| findstr :%PORT%
+    echo.
+    echo       Startup will not continue, because it would serve a stale build.
+    exit /b 1
 )
 exit /b 0
 
