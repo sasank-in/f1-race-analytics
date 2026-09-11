@@ -216,8 +216,68 @@ def test_undercut_fails_against_fresh_tyres() -> None:
 
 def test_marginal_call_is_reported_as_marginal() -> None:
     """Within half a second either way is not a decision the model should make."""
-    window = _window(gap_s=1.2, defender_tyre_age=5.0, degradation_s_per_lap=0.02)
+    # A mid-age tyre and a gap the undercut only just clears. The earlier fixture
+    # used a 5-lap-old tyre with 0.02 s/lap wear, which under the corrected model is
+    # correctly a "hold": there is almost nothing to gain from pitting against a set
+    # that fresh.
+    window = _window(gap_s=1.2, defender_tyre_age=8.0, degradation_s_per_lap=0.1)
     assert window.verdict == "marginal"
+
+
+def test_undercut_gain_is_a_per_lap_rate_not_a_cumulative_deficit() -> None:
+    """The bug this guards: degradation x tyre_age is the whole accumulated deficit.
+
+    Multiplying that by the response window counts the same lost time once per lap,
+    which produced 5-7s gains where a real undercut wins by one or two — and reported
+    392 of 480 opportunities as working. A gain over a two-lap window must stay in the
+    same order as the tyre advantage itself, not several times it.
+    """
+    window = undercut.evaluate_undercut(
+        session_id=1,
+        attacker="1",
+        defender="2",
+        lap_number=20,
+        gap_s=1.0,
+        defender_tyre_age=25.0,
+        degradation_s_per_lap=0.1,
+        net_pit_loss_s=22.0,
+    )
+    # 25 laps of 0.1 s/lap wear is a 2.5s deficit. The gain must stay in that order —
+    # the broken model returned 5.5s here, more than twice the deficit itself.
+    assert window.total_gain_s < 3.5
+    assert window.total_gain_s > 0.5
+
+
+def test_a_fresher_rival_is_a_worse_undercut_target() -> None:
+    """Tyre age must still drive the gain, or the model has lost its physics."""
+    def gain(age: float) -> float:
+        return undercut.evaluate_undercut(
+            session_id=1, attacker="1", defender="2", lap_number=10,
+            gap_s=1.0, defender_tyre_age=age, degradation_s_per_lap=0.1,
+            net_pit_loss_s=22.0,
+        ).total_gain_s
+
+    assert gain(3) < gain(10) < gain(25)
+
+
+def test_most_opportunities_are_not_free_wins() -> None:
+    """A sanity bound on the model as a whole.
+
+    Undercutting is a judgement call, not a cheat code. If a plausible spread of gaps
+    and tyre ages comes back overwhelmingly "undercut", the gain term is inflated.
+    """
+    verdicts = [
+        undercut.evaluate_undercut(
+            session_id=1, attacker="1", defender="2", lap_number=lap,
+            gap_s=gap, defender_tyre_age=age, degradation_s_per_lap=0.1,
+            net_pit_loss_s=22.0,
+        ).verdict
+        for lap, gap, age in [
+            (5, 0.5, 4), (10, 1.2, 8), (15, 2.0, 12), (20, 2.8, 16),
+            (25, 0.8, 20), (30, 1.5, 6), (35, 2.4, 10), (40, 1.0, 14),
+        ]
+    ]
+    assert verdicts.count("undercut") < len(verdicts) * 0.6
 
 
 def test_gain_never_goes_negative() -> None:

@@ -85,12 +85,37 @@ def evaluate_undercut(
 ) -> UndercutWindow:
     """Evaluate one undercut opportunity.
 
-    The advantage comes from the degradation the defender has already accumulated,
-    plus a fixed bonus for fresh rubber. It is capped below by zero: a fresh tyre is
-    never *slower* than a worn one, so a negative advantage means the model's inputs
-    disagree, not that pitting would lose time on pace.
+    The attacker gains, on each lap before the defender responds, the difference
+    between a fresh tyre and the defender's current one: the degradation slope times
+    how old that tyre is, plus a fixed bonus for warm rubber and clear track.
+
+    **That per-lap difference is not the defender's cumulative loss.** An earlier
+    version multiplied ``degradation x tyre_age`` — already the whole deficit a worn
+    tyre has accumulated — by the response window, counting the same time twice and
+    producing 5-7s gains where a real undercut wins by one or two. It reported 392 of
+    480 opportunities as working; if four in five undercuts succeeded, every team
+    would pit on every lap they were within three seconds.
+
+    The per-lap advantage is therefore the *marginal* rate: what one further lap on
+    old rubber costs the defender relative to a fresh set, which is the slope itself
+    plus the out-lap bonus spread across the window.
+
+    Capped below by zero: a fresh tyre is never slower than a worn one, so a negative
+    advantage means the inputs disagree, not that pitting loses time on pace.
     """
-    gain_per_lap = max(0.0, degradation_s_per_lap * defender_tyre_age + fresh_tyre_bonus_s)
+    # Per lap of the response window, the attacker's fresh tyre is quicker than the
+    # defender's by the slope times how much younger it is. The attacker's set is new,
+    # so the age difference IS the defender's tyre age — but the advantage accrues one
+    # lap at a time, it is not the whole accumulated deficit collected every lap.
+    #
+    # Over `response_laps` the defender's tyre also keeps ageing, so the edge grows
+    # slightly; the mean advantage across the window is what matters.
+    ages = [defender_tyre_age + n for n in range(max(response_laps, 1))]
+    mean_edge = sum(degradation_s_per_lap * a for a in ages) / len(ages)
+    # The fresh-tyre bonus is a one-off out-lap benefit, not a per-lap rate, so it is
+    # spread across the window rather than applied to every lap.
+    per_lap = mean_edge / max(response_laps, 1) + fresh_tyre_bonus_s / max(response_laps, 1)
+    gain_per_lap = max(0.0, per_lap)
     return UndercutWindow(
         session_id=session_id,
         attacker=attacker,
