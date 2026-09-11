@@ -33,6 +33,12 @@ export function PaceChart({ data }: { data: PaceResponse }) {
   const maxGap = Math.max(...drivers.map((d) => d.gap_to_best_s), 0.001);
   const rowHeight = 26;
 
+  // "Thin" is relative to this race, not an absolute lap count: a rain-shortened
+  // race may run 21 laps in total, where 13 clean laps is a full sample rather
+  // than a sparse one. Two thirds of the field's best is the cut.
+  const bestSample = Math.max(...drivers.map((d) => d.n_laps), 1);
+  const thinSample = bestSample * 0.67;
+
   return (
     <div className="space-y-1">
       {/* Column headers. These label what follows, so they belong above the rows —
@@ -105,10 +111,22 @@ export function PaceChart({ data }: { data: PaceResponse }) {
             <span className="tnum w-20 text-right font-medium">
               {formatLapTime(driver.pace_s)}
             </span>
+            {/* A pace figure from 13 laps is a weaker claim than one from 21, and
+                the bars give no hint of that. Mark the thin samples so a reader
+                knows which rows to trust less; the engine already refuses fewer
+                than ten, so this flags "few" rather than "invalid". */}
             <span
               className="tnum w-10 text-right"
-              style={{ color: "var(--text-muted)" }}
-              title={`${driver.n_laps} clean laps`}
+              style={{
+                color: driver.n_laps < thinSample
+                  ? "var(--warning)"
+                  : "var(--text-muted)",
+              }}
+              title={
+                driver.n_laps < thinSample
+                  ? `${driver.n_laps} clean laps — fewer than most of the field, so this pace is a weaker estimate`
+                  : `${driver.n_laps} clean laps`
+              }
             >
               {driver.n_laps}
             </span>
@@ -148,13 +166,29 @@ export function DegradationChart({ data }: { data: DegradationResponse }) {
   const compounds = data.compounds;
   if (compounds.length === 0) return null;
 
-  const maxValue = Math.max(
-    ...compounds.map((c) => c.degradation_s_per_lap + c.degradation_iqr_s / 2),
-    0.05,
-  );
+  // A FIXED scale, not one derived from this session's worst compound.
+  //
+  // Scaling to the local maximum makes every race look the same: 0.05 s/lap at a
+  // gentle circuit draws the same bar as 0.20 s/lap at a harsh one, so two races
+  // cannot be compared — which is most of the point of having the chart. 0.22 s/lap
+  // is the upper physical bound from Kolbe et al., the same constant the stint fit
+  // uses to reject implausible slopes, so a full bar means "as bad as tyres get".
+  const SCALE_MAX = 0.22;
+  const maxValue = SCALE_MAX;
 
   return (
     <div className="space-y-3">
+      {/* Axis ticks: without them a bar length is a ratio to nothing. */}
+      <div
+        className="flex text-[10px]"
+        style={{ color: "var(--text-muted)" }}
+        aria-hidden
+      >
+        <span className="flex-1">0</span>
+        <span className="flex-1 text-center">0.11</span>
+        <span className="text-right">0.22 s/lap</span>
+      </div>
+
       {compounds.map((compound) => {
         const centre = (compound.degradation_s_per_lap / maxValue) * 100;
         const halfSpread = (compound.degradation_iqr_s / 2 / maxValue) * 100;

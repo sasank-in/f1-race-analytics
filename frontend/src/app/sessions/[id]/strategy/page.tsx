@@ -143,9 +143,13 @@ export default async function StrategyPage({
                 </thead>
                 <tbody>
                   {/* The marginal ones are the interesting ones: a call that is
-                      clearly on or clearly off needs no analysis. */}
+                      clearly on or clearly off needs no analysis. Sorted by how
+                      close they actually were — taking them in lap order listed the
+                      *earliest* calls under a heading promising the closest. */}
                   {undercut.windows
                     .filter((w) => w.verdict === "marginal")
+                    .slice()
+                    .sort((a, b) => Math.abs(a.margin_s) - Math.abs(b.margin_s))
                     .slice(0, 10)
                     .map((w, i) => (
                       <tr key={`${w.lap_number}-${w.attacker}-${i}`}
