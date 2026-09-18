@@ -10,6 +10,8 @@
 import { api, type RatingsResponse } from "@/api/client";
 import { Card, ErrorNote } from "@/components/ui";
 
+export const metadata = { title: "Ratings" };
+
 export const revalidate = 60;
 
 const COMPONENTS = [

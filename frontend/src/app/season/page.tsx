@@ -12,6 +12,8 @@ import { api, formatLapTime, type SeasonPaceResponse, type SeasonProfileResponse
 import { SeasonPaceChart } from "@/components/season-charts";
 import { Card, ErrorNote } from "@/components/ui";
 
+export const metadata = { title: "Season" };
+
 export const revalidate = 60;
 
 async function attempt<T>(fn: () => Promise<T>): Promise<T | { error: string }> {

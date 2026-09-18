@@ -9,6 +9,8 @@
 import { api, type TeammatesResponse } from "@/api/client";
 import { Card, ErrorNote } from "@/components/ui";
 
+export const metadata = { title: "Teammates" };
+
 export const revalidate = 60;
 
 export default async function TeammatesPage({

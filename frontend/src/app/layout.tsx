@@ -4,7 +4,12 @@ import { Nav } from "@/components/nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "F1 Race Analysis Engine",
+  // A template rather than a fixed string: with eight pages, tabs that all read
+  // "F1 Race Analysis Engine" are indistinguishable once more than one is open.
+  title: {
+    default: "F1 Race Analysis Engine",
+    template: "%s · F1 Race Analysis Engine",
+  },
   description:
     "Fuel-corrected pace, tyre degradation, strategy and telemetry analysis",
 };

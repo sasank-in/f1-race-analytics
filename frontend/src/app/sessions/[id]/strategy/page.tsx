@@ -11,6 +11,20 @@ import { api, type Session } from "@/api/client";
 import { StintTimeline, UndercutChart } from "@/components/strategy-charts";
 import { Card, CompoundTag, Empty, ErrorNote, Stat } from "@/components/ui";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  try {
+    const session = await api.session(Number(id));
+    return { title: `Strategy — ${session.event_name} ${session.season_year}` };
+  } catch {
+    return { title: "Strategy" };
+  }
+}
+
 export const revalidate = 60;
 
 async function attempt<T>(fn: () => Promise<T>): Promise<T | { error: string }> {

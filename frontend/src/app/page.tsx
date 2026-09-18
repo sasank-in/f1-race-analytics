@@ -13,6 +13,10 @@ import { api, type SessionSummary } from "@/api/client";
 import { RaceList } from "@/components/race-list";
 import { Empty, ErrorNote } from "@/components/ui";
 
+// No title override here: a page in the same segment as the root layout does not
+// get its template applied, so "Races" would replace the product name outright
+// rather than being suffixed by it. The layout's default is the right tab title
+// for the index anyway.
 export const revalidate = 60;
 
 export default async function RacesPage() {

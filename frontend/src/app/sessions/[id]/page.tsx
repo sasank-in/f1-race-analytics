@@ -17,6 +17,25 @@ import { DegradationChart, PaceChart } from "@/components/charts";
 import { PositionChart } from "@/components/position-chart";
 import { Card, CompoundTag, Empty, ErrorNote, Stat } from "@/components/ui";
 
+/**
+ * A dynamic title: "Bahrain Grand Prix 2023" identifies the tab, where a static
+ * "Race" would leave three open races indistinguishable.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  try {
+    const session = await api.session(Number(id));
+    return { title: `${session.event_name} ${session.season_year}` };
+  } catch {
+    // The page itself reports the failure; a generic tab title is enough here.
+    return { title: "Race" };
+  }
+}
+
 export const revalidate = 60;
 
 async function attempt<T>(fn: () => Promise<T>): Promise<T | { error: string }> {
