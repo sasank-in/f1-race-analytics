@@ -41,7 +41,18 @@ export function SeasonPaceChart({ data }: { data: SeasonPaceResponse }) {
   const [smooth, setSmooth] = useState(true);
 
   const rounds = data.rounds;
-  if (rounds.length < 2 || data.drivers.length === 0) return null;
+  // One round is a point, not a trend. Returning null left the card rendered with a
+  // caveat above an empty space, which reads as a broken chart rather than a season
+  // that has barely started — so say which it is.
+  if (rounds.length < 2 || data.drivers.length === 0) {
+    return (
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {data.drivers.length === 0
+          ? "No pace rankings for this season yet. Run `f1x analyse all` after ingesting."
+          : `Only round ${rounds[0]} is loaded. A pace curve needs at least two rounds — fetch another race to draw one.`}
+      </p>
+    );
+  }
 
   const named = data.drivers.slice(0, NAMED_SERIES);
   const rest = data.drivers.slice(NAMED_SERIES);
