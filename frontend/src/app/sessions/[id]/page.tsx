@@ -15,6 +15,7 @@ import Link from "next/link";
 import { api, formatLapTime, type Session } from "@/api/client";
 import { DegradationChart, PaceChart } from "@/components/charts";
 import { PositionChart } from "@/components/position-chart";
+import { StintFits } from "@/components/stint-fits";
 import { Card, CompoundTag, Empty, ErrorNote, Stat } from "@/components/ui";
 
 /**
@@ -77,6 +78,15 @@ export default async function SessionPage({
     attempt(() => api.insights(sessionId)),
     attempt(() => api.laps(sessionId)),
   ]);
+
+  // What the field actually did, pulled from the strategy finding. The simulation
+  // ranks strategies in the abstract; the comparison between its preference and the
+  // real call is the part worth looking at, and neither number means much alone.
+  const actualStops = (() => {
+    if (isError(insights)) return null;
+    const strategy = (insights.insights ?? []).find((i) => i.kind === "strategy");
+    return strategy?.magnitude != null ? Math.round(strategy.magnitude) : null;
+  })();
 
   // Driver codes for the position chart, which reads laps rather than the ranking.
   const codes = new Map<string, string>();
@@ -353,15 +363,28 @@ export default async function SessionPage({
             </div>
 
             <div className="space-y-2">
-              {simulation.strategies.map((strategy) => (
+              {simulation.strategies.map((strategy, index) => (
                 <div key={strategy.n_stops} className="flex items-center gap-3 text-xs">
                   <span className="w-14 font-medium">{strategy.n_stops}-stop</span>
+                  {/* The strategy the field actually ran, marked so the model's
+                      preference can be read against the real call. */}
+                  <span
+                    className="w-14 shrink-0 text-[10px]"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {strategy.n_stops === actualStops ? "ran this" : ""}
+                  </span>
                   <div className="relative h-4 flex-1">
                     <div
                       className="h-4 rounded-r"
                       style={{
                         width: `${Math.max(strategy.win_rate * 100, 0.5)}%`,
-                        background: "var(--series-1)",
+                        // The leading strategy is the answer; the rest are context.
+                        // One colour for every bar left the ranking to the numbers.
+                        background:
+                          index === 0 ? "var(--series-1)" : "var(--surface-2)",
+                        boxShadow:
+                          index === 0 ? undefined : "inset 0 0 0 1px var(--border-strong)",
                       }}
                     />
                   </div>
@@ -377,9 +400,39 @@ export default async function SessionPage({
                 </div>
               ))}
             </div>
+            {/* State the comparison rather than leaving the reader to make it. The
+                model preferring a different stop count from the one the field ran is
+                the finding; agreement is worth saying too, as corroboration. */}
+            {actualStops != null && simulation.strategies.length > 0 && (
+              <p className="mt-3 text-xs" style={{ color: "var(--text-primary)" }}>
+                {simulation.strategies[0].n_stops === actualStops ? (
+                  <>
+                    The field ran a {actualStops}-stop, and the model agrees — it wins{" "}
+                    {(simulation.strategies[0].win_rate * 100).toFixed(0)}% of simulated
+                    races.
+                  </>
+                ) : (
+                  <>
+                    The field ran a {actualStops}-stop; the model prefers a{" "}
+                    {simulation.strategies[0].n_stops}-stop, which wins{" "}
+                    {(simulation.strategies[0].win_rate * 100).toFixed(0)}% of simulated
+                    races against{" "}
+                    {(
+                      (simulation.strategies.find((x) => x.n_stops === actualStops)
+                        ?.win_rate ?? 0) * 100
+                    ).toFixed(0)}
+                    % for the one they chose.
+                  </>
+                )}
+              </p>
+            )}
+
             <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
               Bars show how often each strategy produced the fastest race; the trailing
-              figure is the width of the middle 90 % of outcomes.
+              figure is the width of the middle 90 % of outcomes. The model sees tyre
+              wear and pit loss, not traffic, weather or a safety car arriving at the
+              wrong moment — a disagreement is a question to ask, not a verdict on the
+              call.
             </p>
           </>
         )}
@@ -388,66 +441,9 @@ export default async function SessionPage({
       {!isError(degradation) && degradation.stints.length > 0 && (
         <Card
           title="Stint fits"
-          subtitle="Every fitted stint, including the ones that failed"
+          subtitle="The audit trail behind every degradation number"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr style={{ color: "var(--text-muted)" }}>
-                  <th className="pb-2 text-left font-normal">car</th>
-                  <th className="pb-2 text-left font-normal">stint</th>
-                  <th className="pb-2 text-left font-normal">compound</th>
-                  <th className="pb-2 text-right font-normal">laps</th>
-                  <th className="pb-2 text-right font-normal">pace</th>
-                  <th className="pb-2 text-right font-normal">deg s/lap</th>
-                  <th className="pb-2 text-right font-normal">r²</th>
-                </tr>
-              </thead>
-              <tbody>
-                {degradation.stints.slice(0, 40).map((stint) => (
-                  <tr
-                    key={`${stint.driver_number}-${stint.stint}`}
-                    style={{
-                      color:
-                        stint.is_physical === false
-                          ? "var(--text-muted)"
-                          : "var(--text-secondary)",
-                    }}
-                  >
-                    <td className="tnum py-1">#{stint.driver_number}</td>
-                    <td className="tnum py-1">{stint.stint}</td>
-                    <td className="py-1">
-                      <CompoundTag compound={stint.compound} />
-                    </td>
-                    <td className="tnum py-1 text-right">{stint.n_laps}</td>
-                    <td className="tnum py-1 text-right">
-                      {formatLapTime(stint.pace_s)}
-                    </td>
-                    <td
-                      className="tnum py-1 text-right"
-                      style={{
-                        color:
-                          stint.is_physical === false
-                            ? "var(--warning)"
-                            : "var(--text-primary)",
-                      }}
-                      title={
-                        stint.is_physical === false
-                          ? "Negative slope: the stint was too short to support an estimate"
-                          : undefined
-                      }
-                    >
-                      {stint.degradation_s_per_lap >= 0 ? "+" : ""}
-                      {stint.degradation_s_per_lap.toFixed(3)}
-                    </td>
-                    <td className="tnum py-1 text-right">
-                      {stint.r_squared?.toFixed(2) ?? "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <StintFits stints={degradation.stints} />
         </Card>
       )}
     </div>
