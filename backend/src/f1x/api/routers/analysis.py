@@ -151,12 +151,17 @@ def get_degradation(session_id: int) -> DegradationResponse:
             StintFitOut(**dict(row))
             for row in conn.execute(
                 text(
-                    "SELECT driver_number, stint, compound, n_laps, pace_s, "
-                    "       degradation_s_per_lap, is_physical, is_reliable, r_squared, "
-                    "       tyre_age_range, excluded_lap_count "
-                    "FROM mart.stint_fits "
-                    "WHERE session_id = :s AND engine_version = :v "
-                    "ORDER BY driver_number, stint"
+                    "SELECT sf.driver_number, d.abbreviation, sf.stint, sf.compound, "
+                    "       sf.n_laps, sf.pace_s, sf.degradation_s_per_lap, "
+                    "       sf.is_physical, sf.is_reliable, sf.r_squared, "
+                    "       sf.tyre_age_range, sf.excluded_lap_count "
+                    "FROM mart.stint_fits sf "
+                    "LEFT JOIN core.entries en "
+                    "  ON en.session_id = sf.session_id "
+                    " AND en.driver_number = sf.driver_number "
+                    "LEFT JOIN core.drivers d ON d.id = en.driver_id "
+                    "WHERE sf.session_id = :s AND sf.engine_version = :v "
+                    "ORDER BY sf.driver_number, sf.stint"
                 ),
                 {"s": session_id, "v": ENGINE_VERSION},
             ).mappings()
