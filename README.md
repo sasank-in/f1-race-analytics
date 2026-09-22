@@ -40,8 +40,10 @@ scored against the rival's tyre age and the cost of a stop.
 **How did the tyres behave?** Compound degradation curves with their interquartile
 spread, fitted after the warm-up phase and bounded by published research.
 
-**Where on the lap was the time?** Two laps aligned by distance, with a cumulative delta
-and corner-by-corner comparison, on a track map drawn from GPS.
+**Where on the lap was the time?** Each driver's three sector times as a gap to the
+quickest car in that sector — at Bahrain 2023 the three benchmarks belong to three
+different drivers. Then two laps aligned by distance, with a cumulative delta and
+corner-by-corner comparison, on a track map drawn from GPS.
 
 **What happened across a season?** Circuits ranked by tyre demand, and each driver's pace
 through the calendar.

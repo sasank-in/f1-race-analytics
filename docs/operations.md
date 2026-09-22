@@ -128,7 +128,7 @@ lists its options.
 
 ## API reference
 
-Twenty-three endpoints under `/api/v1`, plus `/health`, which reports database
+Twenty-four endpoints under `/api/v1`, plus `/health`, which reports database
 reachability and the engine version. Interactive documentation is at `/docs` once the
 service is running.
 
@@ -143,6 +143,7 @@ changes what is stored, and it only ever adds or replaces a race.
 | `GET /analysis/laps/{id}` | Laps, optionally representative only |
 | `GET /analysis/pace/{id}` | Fuel-corrected pace ranking with finishing result |
 | `GET /analysis/degradation/{id}` | Compound degradation curves |
+| `GET /analysis/sectors/{id}` | Each driver's sector times as a gap to the quickest car there |
 | `GET /insights/{id}` | Winner, podium, and what was notable about the race |
 | `GET /strategy/{id}` | Pit loss and optimal stop count |
 | `GET /undercut/{id}` | Undercut and overcut windows, lap by lap |
