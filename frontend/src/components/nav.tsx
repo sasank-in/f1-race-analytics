@@ -24,7 +24,8 @@ export function Nav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-5 text-sm">
+    // Wraps rather than overflowing: five items at 390px do not fit one row.
+    <nav className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
       {LINKS.map(({ href, label }) => {
         // Race pages live under /sessions, so the races tab stays lit while reading one.
         const active =
