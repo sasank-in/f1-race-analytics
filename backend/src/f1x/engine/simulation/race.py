@@ -52,7 +52,9 @@ class RaceConditions:
     net_pit_loss_s: float
     degradation_s_per_lap: float
 
-    # Measured at 0.59 across the 2023 season, not assumed.
+    # A prior, used only when too few races are ingested to measure one. The API
+    # overrides it with the observed rate across the loaded races — the comment here
+    # previously claimed "measured, not assumed" while nothing did the measuring.
     safety_car_probability: float = 0.59
     safety_car_laps: int = 4
     lap_time_noise_s: float = LAP_TIME_NOISE_S

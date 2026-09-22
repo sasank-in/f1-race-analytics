@@ -250,3 +250,54 @@ def test_pace_sensitivity_is_calibrated_to_an_observed_season() -> None:
         1 for _ in range(2000) if _finishing_order(gaps, rng, PACE_SENSITIVITY)[0] == 0
     )
     assert 0.75 <= wins / 2000 <= 0.92
+
+
+def test_safety_car_probability_is_a_prior_not_a_measurement() -> None:
+    """The default must stay overridable, because the API measures the real rate.
+
+    An earlier comment on this field claimed "measured across the 2023 season, not
+    assumed" while nothing measured anything — it was a literal applied to every
+    circuit. The API now derives it from race-control messages, so the constructor
+    has to accept an override rather than treating 0.59 as fixed.
+    """
+    default = RaceConditions(
+        total_laps=57, base_lap_s=95.0, net_pit_loss_s=25.0, degradation_s_per_lap=0.1
+    )
+    assert default.safety_car_probability == 0.59
+
+    measured = RaceConditions(
+        total_laps=57,
+        base_lap_s=95.0,
+        net_pit_loss_s=25.0,
+        degradation_s_per_lap=0.1,
+        safety_car_probability=0.644,
+    )
+    assert measured.safety_car_probability == 0.644
+
+    # And the override must actually reach the sampler.
+    never = simulate_strategy(
+        RaceConditions(
+            total_laps=20,
+            base_lap_s=90.0,
+            net_pit_loss_s=25.0,
+            degradation_s_per_lap=0.1,
+            safety_car_probability=0.0,
+        ),
+        (10, 10),
+        iterations=200,
+        seed=11,
+    )
+    always = simulate_strategy(
+        RaceConditions(
+            total_laps=20,
+            base_lap_s=90.0,
+            net_pit_loss_s=25.0,
+            degradation_s_per_lap=0.1,
+            safety_car_probability=1.0,
+        ),
+        (10, 10),
+        iterations=200,
+        seed=11,
+    )
+    assert never.safety_car_rate == 0.0
+    assert always.safety_car_rate == 1.0

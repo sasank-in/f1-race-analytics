@@ -240,6 +240,39 @@ def get_stints(session_id: int) -> StintTimelineResponse:
     )
 
 
+
+SAFETY_CAR_RATE_QUERY = """
+    SELECT count(DISTINCT s.id) AS races,
+           count(DISTINCT s.id) FILTER (
+               WHERE EXISTS (
+                   SELECT 1 FROM core.race_control rc
+                   WHERE rc.session_id = s.id
+                     AND rc.message ILIKE '%SAFETY CAR DEPLOYED%'
+                     AND rc.message NOT ILIKE '%VIRTUAL%'
+               )
+           ) AS with_safety_car
+    FROM core.sessions s
+    WHERE s.kind = 'R'
+"""
+
+#: Below this many races the pooled rate is not worth preferring to the prior.
+MIN_RACES_FOR_SC_RATE = 10
+
+
+def _measured_safety_car_rate() -> float | None:
+    """Share of ingested races that saw a full safety car, or None if too few races.
+
+    Returning None rather than a figure from three races is deliberate: the model's
+    published default is a better estimate than a rate measured on almost nothing.
+    """
+    with get_engine().connect() as conn:
+        row = conn.execute(text(SAFETY_CAR_RATE_QUERY)).mappings().one()
+    races = int(row["races"] or 0)
+    if races < MIN_RACES_FOR_SC_RATE:
+        return None
+    return float(row["with_safety_car"] or 0) / races
+
+
 @router.get("/simulate/{session_id}", response_model=SimulationResponse)
 def simulate_race(
     session_id: int,
@@ -270,11 +303,28 @@ def simulate_race(
             detail=f"session {session_id} has too few clean pit stops to simulate",
         )
 
+    # Safety-car rate measured from race control, not assumed.
+    #
+    # The default in RaceConditions was a literal 0.59 applied to every circuit while
+    # the deployments themselves sit in core.race_control. Per-circuit rates would be
+    # better still, but with at most two races per circuit here they come back as 0.00
+    # or 1.00 — noise, not a rate. So this is the pooled figure across every ingested
+    # race, which is the finest split the data actually supports.
+    #
+    # Virtual safety cars are excluded: they neutralise the race without opening the
+    # cheap-stop window that makes a full safety car strategically interesting, which
+    # is the only thing the simulation models about them.
+    observed_sc = _measured_safety_car_rate()
     conditions = RaceConditions(
         total_laps=total_laps,
         base_lap_s=base_lap,
         net_pit_loss_s=loss.net_loss_s,
         degradation_s_per_lap=degradation,
+        safety_car_probability=(
+            observed_sc
+            if observed_sc is not None
+            else RaceConditions.safety_car_probability
+        ),
     )
     comparison = compare_strategies(
         conditions,
