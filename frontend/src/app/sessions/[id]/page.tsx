@@ -217,14 +217,30 @@ export default async function SessionPage({
       </Card>
 
       {/* What actually happened to the order, as against what the pace model says
-          should have. The two disagreeing is the interesting case. */}
-      {!isError(laps) && laps.some((lap) => lap.position != null) && (
+          should have. The two disagreeing is the interesting case.
+
+          The card renders even when the data is absent. Dropping it silently made
+          two races look like two different applications — a reader comparing a 2022
+          race with a 2023 one saw six cards against seven and no reason why. */}
+      {!isError(laps) && (
         <Card
           title="Race position"
           subtitle="Position on the road, lap by lap"
-          caveat="A pit stop shows as a drop and recovery, not as lost places on track. Click a driver to isolate them."
+          caveat={
+            laps.some((lap) => lap.position != null)
+              ? "A pit stop shows as a drop and recovery, not as lost places on track. Click a driver to isolate them."
+              : undefined
+          }
         >
-          <PositionChart laps={laps} codes={codes} />
+          {laps.some((lap) => lap.position != null) ? (
+            <PositionChart laps={laps} codes={codes} />
+          ) : (
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              No lap-by-lap position for this race. Position comes from the positional
+              trace, which is only stored when a session is ingested with telemetry —
+              re-fetch this race with telemetry enabled to draw the chart.
+            </p>
+          )}
         </Card>
       )}
 
