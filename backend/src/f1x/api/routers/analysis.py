@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import text
 
-from f1x.api.deps import get_engine
+from f1x.api.deps import ResponseCache, get_cache, get_engine
 from f1x.api.schemas import (
     DegradationOut,
     DegradationResponse,
@@ -18,6 +18,8 @@ from f1x.api.schemas import (
     Meta,
     PaceOut,
     PaceResponse,
+    SectorProfileOut,
+    SectorsResponse,
     StintFitOut,
 )
 from f1x.config import ENGINE_VERSION
@@ -173,3 +175,78 @@ def get_degradation(session_id: int) -> DegradationResponse:
         compounds=compounds,
         stints=stints,
     )
+
+
+SECTORS_QUERY = """
+    SELECT l.driver_number, d.abbreviation,
+           l.sector1_s, l.sector2_s, l.sector3_s
+    FROM core.laps l
+    LEFT JOIN core.entries en
+           ON en.session_id = l.session_id AND en.driver_number = l.driver_number
+    LEFT JOIN core.drivers d ON d.id = en.driver_id
+    WHERE l.session_id = :s
+      AND l.sector1_s IS NOT NULL
+      AND l.sector2_s IS NOT NULL
+      AND l.sector3_s IS NOT NULL
+      -- Same validity gate the pace ranking applies: an inaccurate lap describes the
+      -- feed's uncertainty, not the car.
+      AND l.is_accurate
+      AND NOT l.deleted
+"""
+
+
+@router.get("/sectors/{session_id}", response_model=SectorsResponse)
+def get_sectors(session_id: int) -> SectorsResponse:
+    """Where on the lap each car was quick.
+
+    The pace ranking says which car was fastest; this says where the time came from,
+    which is the difference between "slower" and "slow in the final sector".
+    """
+    import polars as pl
+
+    from f1x.engine.pace.sectors import build_sector_profiles
+
+    cache = get_cache()
+    key = ResponseCache.key("sectors", {"session": session_id})
+    if (hit := cache.get(key)) is not None:
+        return SectorsResponse(**hit)
+
+    with get_engine().connect() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(text(SECTORS_QUERY), {"s": session_id}).mappings()
+        ]
+
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no sector times for session {session_id}. Older seasons and "
+            "sessions ingested without lap detail carry none.",
+        )
+
+    codes = {str(r["driver_number"]): r.get("abbreviation") for r in rows}
+    profiles = build_sector_profiles(pl.DataFrame(rows))
+
+    response = SectorsResponse(
+        session_id=session_id,
+        meta=_meta(session_id),
+        drivers=[
+            SectorProfileOut(
+                driver_number=p.driver_number,
+                abbreviation=codes.get(p.driver_number),
+                n_laps=p.n_laps,
+                sector1_s=p.sector1_s,
+                sector2_s=p.sector2_s,
+                sector3_s=p.sector3_s,
+                gap1_s=p.gap1_s,
+                gap2_s=p.gap2_s,
+                gap3_s=p.gap3_s,
+                strongest_sector=p.strongest_sector,
+                weakest_sector=p.weakest_sector,
+                spread_s=p.spread_s,
+            )
+            for p in profiles
+        ],
+    )
+    cache.set(key, response.model_dump())
+    return response

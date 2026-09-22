@@ -15,6 +15,7 @@ import Link from "next/link";
 import { api, formatLapTime, type Session } from "@/api/client";
 import { DegradationChart, PaceChart } from "@/components/charts";
 import { PositionChart } from "@/components/position-chart";
+import { SectorChart } from "@/components/sector-chart";
 import { StintFits } from "@/components/stint-fits";
 import { Card, CompoundTag, Empty, ErrorNote, Stat } from "@/components/ui";
 
@@ -70,13 +71,15 @@ export default async function SessionPage({
     );
   }
 
-  const [pace, degradation, strategy, simulation, insights, laps] = await Promise.all([
+  const [pace, degradation, strategy, simulation, insights, laps, sectors] =
+    await Promise.all([
     attempt(() => api.pace(sessionId)),
     attempt(() => api.degradation(sessionId)),
     attempt(() => api.strategy(sessionId)),
     attempt(() => api.simulate(sessionId, 2000)),
     attempt(() => api.insights(sessionId)),
     attempt(() => api.laps(sessionId)),
+    attempt(() => api.sectors(sessionId)),
   ]);
 
   // What the field actually did, pulled from the strategy finding. The simulation
@@ -215,6 +218,19 @@ export default async function SessionPage({
           <PaceChart data={pace} />
         )}
       </Card>
+
+      {/* Where the lap time came from. Placed after the pace ranking because it
+          refines that answer rather than replacing it: pace says which car was
+          quickest, this says which part of the circuit it was quickest in. */}
+      {!isError(sectors) && sectors.drivers.length > 0 && (
+        <Card
+          title="Sector strengths"
+          subtitle="Each sector as a gap to the quickest car there"
+          caveat={sectors.note}
+        >
+          <SectorChart drivers={sectors.drivers} />
+        </Card>
+      )}
 
       {/* What actually happened to the order, as against what the pace model says
           should have. The two disagreeing is the interesting case.

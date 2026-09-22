@@ -40,6 +40,8 @@ export type ScheduleResponse = Schemas["ScheduleResponse"];
 export type ScheduledRace = Schemas["ScheduledRaceOut"];
 export type FetchJob = Schemas["FetchJobOut"];
 export type RaceInsights = Schemas["RaceInsightsResponse"];
+export type SectorsResponse = Schemas["SectorsResponse"];
+export type SectorProfile = Schemas["SectorProfileOut"];
 export type Insight = Schemas["InsightOut"];
 export type PodiumEntry = Schemas["PodiumEntryOut"];
 
@@ -122,6 +124,7 @@ export const api = {
   degradation: (id: number) => get<DegradationResponse>(`/analysis/degradation/${id}`),
 
   insights: (id: number) => get<RaceInsights>(`/insights/${id}`),
+  sectors: (id: number) => get<SectorsResponse>(`/analysis/sectors/${id}`),
   strategy: (id: number) => get<StrategyResponse>(`/strategy/${id}`),
   undercut: (id: number, maxGap = 3) =>
     get<UndercutResponse>(`/undercut/${id}?max_gap_s=${maxGap}`),

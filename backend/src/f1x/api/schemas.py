@@ -675,3 +675,43 @@ class RaceInsightsResponse(BaseModel):
     insights: list[InsightOut] = Field(
         default_factory=list, description="Most notable first"
     )
+
+
+# --------------------------------------------------------------------------
+# sectors
+# --------------------------------------------------------------------------
+
+
+class SectorProfileOut(BaseModel):
+    """One driver's sector times, each as a gap to the quickest car there."""
+
+    driver_number: str
+    abbreviation: str | None = None
+    n_laps: int
+
+    sector1_s: float
+    sector2_s: float
+    sector3_s: float
+
+    gap1_s: float = Field(description="Gap to the quickest car in sector 1")
+    gap2_s: float = Field(description="Gap to the quickest car in sector 2")
+    gap3_s: float = Field(description="Gap to the quickest car in sector 3")
+
+    strongest_sector: int = Field(description="Sector this driver is closest in (1-3)")
+    weakest_sector: int = Field(description="Sector this driver loses most in (1-3)")
+    spread_s: float = Field(
+        description="Difference between the largest and smallest sector gap. A car "
+        "slower everywhere has a small spread; a car with one weak sector has a large "
+        "one, and that is the case worth looking at."
+    )
+
+
+class SectorsResponse(BaseModel):
+    session_id: int
+    meta: Meta
+    note: str = Field(
+        default="Sector times at the same 20th percentile the pace ranking uses, so "
+        "the gaps describe the same laps. The benchmark in each sector is set "
+        "independently — the quickest S1 and quickest S2 are often different cars.",
+    )
+    drivers: list[SectorProfileOut]

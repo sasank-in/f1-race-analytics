@@ -175,6 +175,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis/sectors/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sectors
+         * @description Where on the lap each car was quick.
+         *
+         *     The pace ranking says which car was fastest; this says where the time came from,
+         *     which is the difference between "slower" and "slow in the final sector".
+         */
+        get: operations["get_sectors_api_v1_analysis_sectors__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/insights/{session_id}": {
         parameters: {
             query?: never;
@@ -1093,6 +1116,67 @@ export interface components {
             /** Circuits */
             circuits: components["schemas"]["CircuitProfileOut"][];
         };
+        /**
+         * SectorProfileOut
+         * @description One driver's sector times, each as a gap to the quickest car there.
+         */
+        SectorProfileOut: {
+            /** Driver Number */
+            driver_number: string;
+            /** Abbreviation */
+            abbreviation?: string | null;
+            /** N Laps */
+            n_laps: number;
+            /** Sector1 S */
+            sector1_s: number;
+            /** Sector2 S */
+            sector2_s: number;
+            /** Sector3 S */
+            sector3_s: number;
+            /**
+             * Gap1 S
+             * @description Gap to the quickest car in sector 1
+             */
+            gap1_s: number;
+            /**
+             * Gap2 S
+             * @description Gap to the quickest car in sector 2
+             */
+            gap2_s: number;
+            /**
+             * Gap3 S
+             * @description Gap to the quickest car in sector 3
+             */
+            gap3_s: number;
+            /**
+             * Strongest Sector
+             * @description Sector this driver is closest in (1-3)
+             */
+            strongest_sector: number;
+            /**
+             * Weakest Sector
+             * @description Sector this driver loses most in (1-3)
+             */
+            weakest_sector: number;
+            /**
+             * Spread S
+             * @description Difference between the largest and smallest sector gap. A car slower everywhere has a small spread; a car with one weak sector has a large one, and that is the case worth looking at.
+             */
+            spread_s: number;
+        };
+        /** SectorsResponse */
+        SectorsResponse: {
+            /** Session Id */
+            session_id: number;
+            meta: components["schemas"]["Meta"];
+            /**
+             * Note
+             * @default Sector times at the same 20th percentile the pace ranking uses, so the gaps describe the same laps. The benchmark in each sector is set independently — the quickest S1 and quickest S2 are often different cars.
+             */
+            note: string;
+            /** Drivers */
+            drivers: components["schemas"]["SectorProfileOut"][];
+        };
         /** SessionOut */
         SessionOut: {
             /** Id */
@@ -1735,6 +1819,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DegradationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sectors_api_v1_analysis_sectors__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectorsResponse"];
                 };
             };
             /** @description Validation Error */
