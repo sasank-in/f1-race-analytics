@@ -345,6 +345,9 @@ class SimulationResponse(BaseModel):
 
 class DriverRatingOut(BaseModel):
     driver_number: str
+    abbreviation: str | None = Field(
+        default=None, description="Three-letter driver code, when the entry is known"
+    )
     rank: int
     n_races: int
     overall: float
@@ -415,8 +418,13 @@ class TeammateDeltaOut(BaseModel):
     team_key: str | None = None
     driver_a: str
     driver_b: str
+    abbreviation_a: str | None = None
+    abbreviation_b: str | None = None
     n_sessions: int
     faster_driver: str
+    faster_abbreviation: str | None = Field(
+        default=None, description="Code of the faster driver, when the entry is known"
+    )
     margin_s: float = Field(
         description="Median pace gap between the pair, in seconds per lap"
     )
@@ -715,3 +723,17 @@ class SectorsResponse(BaseModel):
         "independently — the quickest S1 and quickest S2 are often different cars.",
     )
     drivers: list[SectorProfileOut]
+
+
+class DeletedSessionOut(BaseModel):
+    """What a delete removed."""
+
+    session_id: int
+    season: int
+    round: int
+    kind: str
+    event_name: str
+    note: str = Field(
+        default="Analysis and stored laps removed. The raw ingest record is kept, so "
+        "re-fetching this race is verifiable against what was originally retrieved.",
+    )

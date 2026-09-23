@@ -193,3 +193,80 @@ def test_job_can_be_polled_after_starting(client: TestClient, monkeypatch) -> No
     body = client.get(f"/api/v1/fetch/{job_id}").json()
     assert body["id"] == job_id
     assert body["year"] == 2024
+
+
+# --------------------------------------------------------------------------
+# delete
+# --------------------------------------------------------------------------
+
+
+def test_deleting_an_unknown_session_is_404(client: TestClient, monkeypatch) -> None:
+    """Silence would hide a wrong id: the caller named something specific."""
+    monkeypatch.setattr(
+        "f1x.api.routers.fetch.delete_session", lambda _session_id, _engine: None
+    )
+    response = client.delete("/api/v1/sessions/99999")
+    assert response.status_code == 404
+
+
+def test_delete_reports_what_it_removed(client: TestClient, monkeypatch) -> None:
+    from f1x.ingest.schedule import DeletedSession
+
+    monkeypatch.setattr(
+        "f1x.api.routers.fetch.delete_session",
+        lambda session_id, _engine: DeletedSession(
+            session_id=session_id,
+            season=2023,
+            round_number=1,
+            kind="R",
+            event_name="Bahrain Grand Prix",
+        ),
+    )
+    body = client.delete("/api/v1/sessions/138").json()
+    assert body["session_id"] == 138
+    assert body["event_name"] == "Bahrain Grand Prix"
+    # The raw ingest record survives, and the response says so.
+    assert "raw ingest record is kept" in body["note"]
+
+
+def test_delete_is_refused_while_a_fetch_is_writing(
+    client: TestClient, monkeypatch
+) -> None:
+    """Deleting rows a running fetch is still writing would half-build the session."""
+    from f1x.ingest import jobs as jobs_module
+
+    job = jobs_module.registry.create(2023, 1, "R", telemetry=True)
+    jobs_module.registry.update(job.id, session_id=4242, state=JobState.INGESTING)
+
+    called: list[int] = []
+    monkeypatch.setattr(
+        "f1x.api.routers.fetch.delete_session",
+        lambda session_id, _engine: called.append(session_id),
+    )
+
+    response = client.delete("/api/v1/sessions/4242")
+    assert response.status_code == 409
+    assert called == [], "the delete must not run while a fetch holds the session"
+
+
+def test_delete_proceeds_once_the_fetch_has_finished(
+    client: TestClient, monkeypatch
+) -> None:
+    """The guard is about an *active* write, not about having ever fetched it."""
+    from f1x.ingest import jobs as jobs_module
+    from f1x.ingest.schedule import DeletedSession
+
+    job = jobs_module.registry.create(2023, 2, "R", telemetry=True)
+    jobs_module.registry.update(job.id, session_id=4343, state=JobState.COMPLETE)
+
+    monkeypatch.setattr(
+        "f1x.api.routers.fetch.delete_session",
+        lambda session_id, _engine: DeletedSession(
+            session_id=session_id,
+            season=2023,
+            round_number=2,
+            kind="R",
+            event_name="Saudi Arabian Grand Prix",
+        ),
+    )
+    assert client.delete("/api/v1/sessions/4343").status_code == 200

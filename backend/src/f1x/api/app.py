@@ -78,9 +78,10 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
         allow_credentials=True,
-        # POST is needed to start a fetch. Still no PUT or DELETE: nothing in this
-        # API edits or removes stored data.
-        allow_methods=["GET", "POST"],
+        # POST starts a fetch; DELETE removes a stored race. Still no PUT: nothing
+        # in this API edits a stored value in place, only adds or removes whole
+        # sessions.
+        allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["*"],
     )
 

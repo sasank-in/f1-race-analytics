@@ -122,3 +122,55 @@ def annotate_ingested(races: list[ScheduledRace], engine: object) -> list[Schedu
         )
         for race in races
     ]
+
+
+@dataclass(frozen=True)
+class DeletedSession:
+    """What a delete removed, so the caller can report it rather than guess."""
+
+    session_id: int
+    season: int
+    round_number: int
+    kind: str
+    event_name: str
+
+
+def delete_session(session_id: int, engine: object) -> DeletedSession | None:
+    """Remove one stored session and everything derived from it.
+
+    Returns what was deleted, or None when the session does not exist — a delete of
+    something already gone is not an error, it is the state the caller wanted.
+
+    Every table that references ``core.sessions`` declares ON DELETE CASCADE, so one
+    statement clears roughly 1.5 M rows for a race with telemetry: laps, entries,
+    results, stints, pit stops, weather, race control, the telemetry and position
+    traces, and every mart table derived from them.
+
+    ``raw.ingest_runs`` is deliberately left alone. It is the immutable record that an
+    ingest happened, with the payload digest that makes a re-fetch verifiable; erasing
+    it would destroy the audit trail the architecture rests on, and it carries no
+    foreign key precisely so a delete cannot take it.
+    """
+    from sqlalchemy import text
+
+    with engine.begin() as conn:  # type: ignore[attr-defined]
+        row = conn.execute(
+            text(
+                "SELECT s.id, e.season_year, e.round, s.kind, e.name "
+                "FROM core.sessions s JOIN core.events e ON e.id = s.event_id "
+                "WHERE s.id = :s"
+            ),
+            {"s": session_id},
+        ).one_or_none()
+        if row is None:
+            return None
+
+        conn.execute(text("DELETE FROM core.sessions WHERE id = :s"), {"s": session_id})
+
+    return DeletedSession(
+        session_id=int(row[0]),
+        season=int(row[1]),
+        round_number=int(row[2]),
+        kind=str(row[3]),
+        event_name=str(row[4]),
+    )

@@ -13,8 +13,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from f1x.api.deps import get_engine
+from f1x.api.deps import get_cache, get_engine
 from f1x.api.schemas import (
+    DeletedSessionOut,
     FetchJobOut,
     FetchRequest,
     ScheduledRaceOut,
@@ -23,7 +24,7 @@ from f1x.api.schemas import (
 from f1x.config import get_settings
 from f1x.ingest.exceptions import IngestionError
 from f1x.ingest.jobs import FetchJob, JobState, registry, start_fetch
-from f1x.ingest.schedule import annotate_ingested, fetch_schedule
+from f1x.ingest.schedule import annotate_ingested, delete_session, fetch_schedule
 
 router = APIRouter(tags=["fetch"])
 
@@ -141,6 +142,43 @@ def get_fetch_job(job_id: str) -> FetchJobOut:
     if job is None:
         raise HTTPException(404, f"no fetch job {job_id}; it may have expired")
     return _as_out(job)
+
+
+@router.delete("/sessions/{session_id}", response_model=DeletedSessionOut)
+def delete_stored_session(session_id: int) -> DeletedSessionOut:
+    """Remove a stored race and everything derived from it.
+
+    The counterpart to fetching. A dataset you can add to but never remove from grows
+    into whatever you happened to try, and a race ingested without telemetry cannot be
+    corrected by re-fetching alone — the old rows have to go first.
+
+    Deleting a race that is not stored returns 404 rather than succeeding quietly: the
+    caller asked to remove something specific, and silence would hide a wrong id.
+    """
+    # A fetch writing these rows while they are being deleted would leave the session
+    # half-built. Refuse rather than race it.
+    for job in registry.all():
+        if not job.is_terminal and job.session_id == session_id:
+            raise HTTPException(
+                409,
+                f"a fetch is still running for session {session_id}; "
+                "wait for it to finish before deleting",
+            )
+
+    deleted = delete_session(session_id, get_engine())
+    if deleted is None:
+        raise HTTPException(404, f"no stored session {session_id}")
+
+    # Cached analysis outlives the rows it described, so it has to go too.
+    get_cache().clear()
+
+    return DeletedSessionOut(
+        session_id=deleted.session_id,
+        season=deleted.season,
+        round=deleted.round_number,
+        kind=deleted.kind,
+        event_name=deleted.event_name,
+    )
 
 
 __all__ = ["JobState", "router"]
