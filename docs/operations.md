@@ -128,7 +128,7 @@ lists its options.
 
 ## API reference
 
-Twenty-four endpoints under `/api/v1`, plus `/health`, which reports database
+Twenty-five operations under `/api/v1`, plus `/health`, which reports database
 reachability and the engine version. Interactive documentation is at `/docs` once the
 service is running.
 
@@ -155,6 +155,7 @@ changes what is stored, and it only ever adds or replaces a race.
 | `GET /season/pace/{season}` | Per-driver pace curve through a calendar |
 | `GET /telemetry/compare/{id}` | Two laps aligned by distance |
 | `GET /telemetry/map/{id}` | Track map drawn from GPS, coloured by speed |
+| `DELETE /sessions/{id}` | Remove a stored race and everything derived from it; the raw ingest record is kept |
 | `GET /schedule/{season}` | Published calendar, marking what is stored locally |
 | `POST /fetch` | Start an on-demand fetch; returns 202 and a job to poll |
 | `GET /fetch` | Recent fetch jobs, newest first |

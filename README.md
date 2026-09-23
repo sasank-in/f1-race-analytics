@@ -92,7 +92,9 @@ pulls a race in on demand. From a terminal:
 ```
 
 Telemetry roughly triples load time; `--no-telemetry` skips it. Re-loading a race
-replaces it rather than duplicating it. The full command set is in
+replaces it rather than duplicating it, and the Fetch page can also remove one — the
+stored analysis goes, the raw ingest record stays, so a re-fetch is still verifiable
+against what was originally retrieved. The full command set is in
 [docs/operations.md](docs/operations.md).
 
 
