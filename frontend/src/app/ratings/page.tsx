@@ -93,7 +93,9 @@ export default async function RatingsPage({
                 <span className="tnum w-5 text-right" style={{ color: "var(--text-muted)" }}>
                   {driver.rank}
                 </span>
-                <span className="tnum w-9 font-medium">#{driver.driver_number}</span>
+                <span className="w-10 font-medium">
+                  {driver.abbreviation ?? `#${driver.driver_number}`}
+                </span>
                 <span className="tnum w-12 font-semibold">
                   {driver.overall.toFixed(1)}
                 </span>

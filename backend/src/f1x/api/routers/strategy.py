@@ -355,6 +355,30 @@ def simulate_race(
     return response
 
 
+
+SEASON_CODES_QUERY = """
+    SELECT DISTINCT en.driver_number, d.abbreviation
+    FROM core.entries en
+    JOIN core.drivers d ON d.id = en.driver_id
+    JOIN core.sessions s ON s.id = en.session_id
+    JOIN core.events e ON e.id = s.event_id
+    WHERE e.season_year = :season AND d.abbreviation IS NOT NULL
+"""
+
+
+def _season_driver_codes(season: int) -> dict[str, str]:
+    """Car number to three-letter code for one season.
+
+    The ratings and teammate engines work in car numbers, which is right — a number is
+    the stable key across a season. But a page reading "#1 by 0.234s" asks the reader
+    to decode before the comparison means anything, so the router attaches the code on
+    the way out. Every other view already does this.
+    """
+    with get_engine().connect() as conn:
+        rows = conn.execute(text(SEASON_CODES_QUERY), {"season": season}).all()
+    return {str(number): str(code) for number, code in rows}
+
+
 @router.get("/ratings/{season}", response_model=RatingsResponse)
 def get_ratings(season: int) -> RatingsResponse:
     """Composite driver ratings for one season.
@@ -400,12 +424,14 @@ def get_ratings(season: int) -> RatingsResponse:
     )
 
     ratings = build_ratings(pace, results, stints)
+    codes = _season_driver_codes(season)
     response = RatingsResponse(
         season=season,
         meta=Meta(engine_version=ENGINE_VERSION),
         drivers=[
             DriverRatingOut(
                 driver_number=r.driver_number,
+                abbreviation=codes.get(r.driver_number),
                 rank=r.rank,
                 n_races=r.n_races,
                 overall=r.overall,
@@ -460,6 +486,7 @@ def get_teammates(season: int) -> TeammatesResponse:
         )
 
     pairings = compare_teammates(pace, entries)
+    codes = _season_driver_codes(season)
     response = TeammatesResponse(
         season=season,
         meta=Meta(engine_version=ENGINE_VERSION),
@@ -468,6 +495,9 @@ def get_teammates(season: int) -> TeammatesResponse:
                 team_key=p.team_key,
                 driver_a=p.driver_a,
                 driver_b=p.driver_b,
+                abbreviation_a=codes.get(p.driver_a),
+                abbreviation_b=codes.get(p.driver_b),
+                faster_abbreviation=codes.get(p.faster_driver),
                 n_sessions=p.n_sessions,
                 faster_driver=p.faster_driver,
                 margin_s=p.margin_s,

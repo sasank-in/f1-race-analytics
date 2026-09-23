@@ -90,8 +90,8 @@ export default async function TeammatesPage({
                   <span className="w-24 truncate" style={{ color: "var(--text-secondary)" }}>
                     {pairing.team_key ?? "—"}
                   </span>
-                  <span className="tnum font-medium">
-                    #{pairing.faster_driver}
+                  <span className="font-medium">
+                    {pairing.faster_abbreviation ?? `#${pairing.faster_driver}`}
                   </span>
                   <span style={{ color: "var(--text-muted)" }}>by</span>
                   <span className="tnum font-semibold">
@@ -114,7 +114,7 @@ export default async function TeammatesPage({
                 {/* Diverging from the centre: driver A left, driver B right. */}
                 <div className="flex items-center gap-2">
                   <span className="tnum w-8 text-right text-xs">
-                    #{pairing.driver_a}
+                    {pairing.abbreviation_a ?? `#${pairing.driver_a}`}
                   </span>
                   <div className="relative h-4 flex-1">
                     <div
@@ -130,7 +130,9 @@ export default async function TeammatesPage({
                       }}
                     />
                   </div>
-                  <span className="tnum w-8 text-xs">#{pairing.driver_b}</span>
+                  <span className="w-10 text-xs">
+                    {pairing.abbreviation_b ?? `#${pairing.driver_b}`}
+                  </span>
                 </div>
 
                 {/* Head-to-head split, which is the part that distinguishes a settled

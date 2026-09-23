@@ -78,7 +78,18 @@ export interface paths {
         get: operations["get_session_api_v1_sessions__session_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Stored Session
+         * @description Remove a stored race and everything derived from it.
+         *
+         *     The counterpart to fetching. A dataset you can add to but never remove from grows
+         *     into whatever you happened to try, and a race ingested without telemetry cannot be
+         *     corrected by re-fetching alone — the old rows have to go first.
+         *
+         *     Deleting a race that is not stored returns 404 rather than succeeding quietly: the
+         *     caller asked to remove something specific, and silence would hide a wrong id.
+         */
+        delete: operations["delete_stored_session_api_v1_sessions__session_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -653,10 +664,36 @@ export interface components {
             /** Stints */
             stints: components["schemas"]["StintFitOut"][];
         };
+        /**
+         * DeletedSessionOut
+         * @description What a delete removed.
+         */
+        DeletedSessionOut: {
+            /** Session Id */
+            session_id: number;
+            /** Season */
+            season: number;
+            /** Round */
+            round: number;
+            /** Kind */
+            kind: string;
+            /** Event Name */
+            event_name: string;
+            /**
+             * Note
+             * @default Analysis and stored laps removed. The raw ingest record is kept, so re-fetching this race is verifiable against what was originally retrieved.
+             */
+            note: string;
+        };
         /** DriverRatingOut */
         DriverRatingOut: {
             /** Driver Number */
             driver_number: string;
+            /**
+             * Abbreviation
+             * @description Three-letter driver code, when the entry is known
+             */
+            abbreviation?: string | null;
             /** Rank */
             rank: number;
             /** N Races */
@@ -1405,10 +1442,19 @@ export interface components {
             driver_a: string;
             /** Driver B */
             driver_b: string;
+            /** Abbreviation A */
+            abbreviation_a?: string | null;
+            /** Abbreviation B */
+            abbreviation_b?: string | null;
             /** N Sessions */
             n_sessions: number;
             /** Faster Driver */
             faster_driver: string;
+            /**
+             * Faster Abbreviation
+             * @description Code of the faster driver, when the entry is known
+             */
+            faster_abbreviation?: string | null;
             /**
              * Margin S
              * @description Median pace gap between the pair, in seconds per lap
@@ -1689,6 +1735,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_stored_session_api_v1_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedSessionOut"];
                 };
             };
             /** @description Validation Error */
