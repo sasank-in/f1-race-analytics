@@ -39,6 +39,7 @@ export type SeasonPaceRow = Schemas["SeasonPaceRowOut"];
 export type ScheduleResponse = Schemas["ScheduleResponse"];
 export type ScheduledRace = Schemas["ScheduledRaceOut"];
 export type FetchJob = Schemas["FetchJobOut"];
+export type DeletedSession = Schemas["DeletedSessionOut"];
 export type RaceInsights = Schemas["RaceInsightsResponse"];
 export type SectorsResponse = Schemas["SectorsResponse"];
 export type SectorProfile = Schemas["SectorProfileOut"];
@@ -106,6 +107,26 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function del<T>(path: string): Promise<T> {
+  const response = await fetch(`${BASE}/api/v1${path}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const payload = await response.json();
+      if (typeof payload?.detail === "string") detail = payload.detail;
+    } catch {
+      // Non-JSON error body; the status-based message stands.
+    }
+    throw new ApiError(response.status, detail);
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export const api = {
   seasons: () => get<Season[]>("/seasons"),
   events: (season?: number) =>
@@ -146,6 +167,7 @@ export const api = {
   startFetch: (year: number, round: number, kind = "R", telemetry = true) =>
     post<FetchJob>("/fetch", { year, round, kind, telemetry }),
   fetchJob: (jobId: string) => get<FetchJob>(`/fetch/${jobId}`, 0),
+  deleteSession: (id: number) => del<DeletedSession>(`/sessions/${id}`),
   fetchJobs: () => get<FetchJob[]>("/fetch", 0),
 
   telemetry: (id: number, a: string, lapA: number, b: string, lapB: number) =>

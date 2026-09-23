@@ -52,6 +52,7 @@ export default function FetchPage() {
   const [telemetry, setTelemetry] = useState(true);
   const [job, setJob] = useState<FetchJob | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   // A calendar is 22-24 rounds and most of them are usually already loaded, so the
   // useful default is "what can I still fetch" rather than the whole list.
   const [filter, setFilter] = useState<CalendarFilter>("all");
@@ -111,6 +112,21 @@ export default function FetchPage() {
       setJob(await api.startFetch(race.season, race.round, "R", telemetry));
     } catch (err) {
       setJobError(err instanceof Error ? err.message : "Could not start the fetch");
+    }
+  };
+
+  const remove = async (race: ScheduledRace) => {
+    if (race.session_id == null) return;
+    setJobError(null);
+    try {
+      const deleted = await api.deleteSession(race.session_id);
+      setNotice(
+        `Removed ${deleted.event_name} ${deleted.season}. The raw ingest record is kept, so re-fetching it stays verifiable.`,
+      );
+      // The calendar's ingested flags are now stale by exactly this row.
+      await loadSchedule(season);
+    } catch (err) {
+      setJobError(err instanceof Error ? err.message : "Could not delete the race");
     }
   };
 
@@ -190,6 +206,15 @@ export default function FetchPage() {
 
       {jobError && <ErrorNote detail={jobError} />}
 
+      {notice && (
+        <p
+          className="rounded-lg border px-4 py-2.5 text-xs"
+          style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--text-secondary)" }}
+        >
+          {notice}
+        </p>
+      )}
+
       <Card
         title={`${season} calendar`}
         subtitle={
@@ -261,6 +286,7 @@ export default function FetchPage() {
                     race={race}
                     disabled={running}
                     onFetch={() => start(race)}
+                    onDelete={() => remove(race)}
                   />
                 ))}
               </div>
@@ -339,11 +365,15 @@ function ScheduleRow({
   race,
   disabled,
   onFetch,
+  onDelete,
 }: {
   race: ScheduledRace;
   disabled: boolean;
   onFetch: () => void;
+  onDelete: () => void;
 }) {
+  const [confirming, setConfirming] = useState(false);
+
   return (
     <div className="flex items-center gap-3 text-xs">
       <span className="tnum w-8 shrink-0 text-right" style={{ color: "var(--text-muted)" }}>
@@ -359,15 +389,52 @@ function ScheduleRow({
         {race.event_date ?? "—"}
       </span>
 
-      <span className="flex w-28 shrink-0 justify-end">
+      <span className="flex w-44 shrink-0 items-center justify-end gap-3">
         {race.is_ingested && race.session_id ? (
-          <Link
-            href={`/sessions/${race.session_id}`}
-            className="underline underline-offset-2"
-            style={{ color: "var(--good)" }}
-          >
-            analyse →
-          </Link>
+          <>
+            <Link
+              href={`/sessions/${race.session_id}`}
+              className="underline underline-offset-2"
+              style={{ color: "var(--good)" }}
+            >
+              analyse →
+            </Link>
+            {/* Two clicks, not one. Deleting drops about 1.5 M rows for a race with
+                telemetry, and a mis-click beside "analyse" would be easy. */}
+            {confirming ? (
+              <span className="flex items-center gap-2">
+                <button
+                  onClick={onDelete}
+                  disabled={disabled}
+                  className="rounded border px-2 py-0.5 disabled:opacity-40"
+                  style={{
+                    borderColor: "var(--critical)",
+                    color: "var(--critical)",
+                    background: "var(--surface-1)",
+                  }}
+                >
+                  confirm
+                </button>
+                <button
+                  onClick={() => setConfirming(false)}
+                  className="underline underline-offset-2"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setConfirming(true)}
+                disabled={disabled}
+                className="underline underline-offset-2 disabled:opacity-40"
+                style={{ color: "var(--text-muted)" }}
+                title="Remove this race and everything derived from it"
+              >
+                delete
+              </button>
+            )}
+          </>
         ) : !race.has_run ? (
           <span style={{ color: "var(--text-muted)" }}>not yet run</span>
         ) : (
