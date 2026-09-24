@@ -7,6 +7,8 @@
  * frequently not the best at managing tyres.
  */
 
+import Link from "next/link";
+
 import { api, type RatingsResponse } from "@/api/client";
 import { Card, ErrorNote } from "@/components/ui";
 
@@ -141,6 +143,14 @@ export default async function RatingsPage({
           ))}
         </div>
       </Card>
+
+      {/* Every other analysis page offers a way back to the race index; these two
+          did not, so the only route out was the header nav. */}
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        <Link href="/" className="underline underline-offset-2">
+          Back to races
+        </Link>
+      </p>
     </div>
   );
 }
