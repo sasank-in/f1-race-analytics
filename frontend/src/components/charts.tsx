@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import { formatGap, formatLapTime } from "@/api/client";
 import type { DegradationResponse, PaceResponse } from "@/api/client";
+import { DEGRADATION_SCALE_MAX } from "./scales";
 import { compoundColor } from "./ui";
 
 /**
@@ -166,15 +167,7 @@ export function DegradationChart({ data }: { data: DegradationResponse }) {
   const compounds = data.compounds;
   if (compounds.length === 0) return null;
 
-  // A FIXED scale, not one derived from this session's worst compound.
-  //
-  // Scaling to the local maximum makes every race look the same: 0.05 s/lap at a
-  // gentle circuit draws the same bar as 0.20 s/lap at a harsh one, so two races
-  // cannot be compared — which is most of the point of having the chart. 0.22 s/lap
-  // is the upper physical bound from Kolbe et al., the same constant the stint fit
-  // uses to reject implausible slopes, so a full bar means "as bad as tyres get".
-  const SCALE_MAX = 0.22;
-  const maxValue = SCALE_MAX;
+  const maxValue = DEGRADATION_SCALE_MAX;
 
   return (
     <div className="space-y-3">

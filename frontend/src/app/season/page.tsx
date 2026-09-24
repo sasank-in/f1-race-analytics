@@ -9,6 +9,7 @@
 import Link from "next/link";
 
 import { api, formatLapTime, type SeasonPaceResponse, type SeasonProfileResponse } from "@/api/client";
+import { DEGRADATION_SCALE_MAX } from "@/components/scales";
 import { SeasonPaceChart } from "@/components/season-charts";
 import { Card, ErrorNote } from "@/components/ui";
 
@@ -55,7 +56,10 @@ export default async function SeasonPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Season view</h1>
+        {/* Year-prefixed like the teammate and ratings pages, which are also
+            season-scoped. "Season view" also disagreed with the nav item that
+            reaches it. */}
+        <h1 className="text-lg font-semibold tracking-tight">{season} season</h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
           Patterns across the calendar, which no single race can show.
         </p>
@@ -106,18 +110,19 @@ export default async function SeasonPage({
               style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
             >
               <span className="w-36">circuit</span>
-              <span className="flex-1">tyre degradation</span>
+              <span className="flex-1">
+                tyre degradation{" "}
+                <span className="font-normal">(0 to 0.22 s/lap)</span>
+              </span>
               <span className="w-16 text-right">s/lap</span>
               <span className="w-20 text-right">stint life</span>
               <span className="w-20 text-right">lap time</span>
             </div>
             <div className="space-y-2">
-              {(() => {
-                const worst = Math.max(
-                  ...circuits.circuits.map((c) => c.degradation_s_per_lap),
-                  0.01,
-                );
-                return circuits.circuits.map((circuit) => (
+              {/* The same fixed scale the per-race degradation chart uses. Scaling
+                  these bars to the worst circuit in the list would make every season
+                  look identically punishing. */}
+              {circuits.circuits.map((circuit) => (
                   <div key={circuit.circuit_key} className="flex items-center gap-3 text-xs">
                     <span className="w-36 shrink-0 truncate">
                       {circuit.circuit_key.replace(/-/g, " ")}
@@ -126,7 +131,7 @@ export default async function SeasonPage({
                       <div
                         className="h-4 rounded-r"
                         style={{
-                          width: `${(circuit.degradation_s_per_lap / worst) * 100}%`,
+                          width: `${Math.min((circuit.degradation_s_per_lap / DEGRADATION_SCALE_MAX) * 100, 100)}%`,
                           background: "var(--series-2)",
                         }}
                       />
@@ -150,8 +155,7 @@ export default async function SeasonPage({
                         : "—"}
                     </span>
                   </div>
-                ));
-              })()}
+              ))}
             </div>
           </>
         )}
