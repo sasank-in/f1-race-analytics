@@ -45,6 +45,11 @@ quickest car in that sector — at Bahrain 2023 the three benchmarks belong to t
 different drivers. Then two laps aligned by distance, with a cumulative delta and
 corner-by-corner comparison, on a track map drawn from GPS.
 
+**Was the strategy the right one?** Each stop count simulated thousands of times, with
+the one the field actually ran marked against it — at Bahrain 2023 the model prefers a
+2-stop, which wins around 58% of simulated races, where the field ran a 3-stop it puts
+nearer 6%. Figures move a point between runs — it is a sampler, not a lookup.
+
 **What happened across a season?** Circuits ranked by tyre demand, and each driver's pace
 through the calendar.
 
@@ -177,11 +182,18 @@ gate is fixed.
 Phases 0–10 are complete: tooling, schema, ingestion, transform, five engine layers, the
 API and the UI. Phase 11 — orchestration, incremental refresh and deployment — remains.
 
-Not yet built: qualifying and practice ingestion, sector decomposition, actual-versus-
-optimal strategy scoring, and driver style fingerprints.
+Not yet built: qualifying and practice ingestion, driver style fingerprints, and any
+use of the stored weather and race-control data beyond the safety-car rate.
 
 The reference backfill covers 2022 and 2023 — 44 races, 47,997 laps, 16.2 M telemetry
-samples — and any race from 2018 onward can be pulled in on demand.
+samples — and any race from 2018 onward can be fetched, or removed again, from the
+Fetch page.
+
+**Two coverage limits worth knowing.** Telemetry was loaded for 2023 but not 2022, so
+the track map, corner analysis and lap-by-lap position are unavailable on those races —
+the pages say so rather than hiding the section. And only race sessions are ingested,
+which is what blocks the fuel-coefficient work described above: fitting it properly
+needs practice long-runs.
 
 
 ## Licence and attribution
